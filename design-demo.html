@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<title>דמו עיצוב — סגנון Windows</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --bg:#f3f3f3;
+  --surface:#ffffff;
+  --surface-2:#fafafa;
+  --border:#e1e1e1;
+  --border-strong:#d1d1d1;
+  --text:#1b1b1b;
+  --text-2:#5c5c5c;
+  --text-3:#8a8886;
+  --accent:#0067c0;
+  --accent-hover:#005a9c;
+  --accent-dark:#003f72;
+  --accent-light:#e8f1fb;
+  --green:#0f7b0f;
+  --green-light:#e6f4e6;
+  --red:#c42b1c;
+  --red-light:#fde7e9;
+  --amber:#9d5d00;
+  --amber-light:#fdf0db;
+  --radius:6px;
+  --radius-lg:8px;
+  --shadow:0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 2px 6px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:'Heebo','Segoe UI',sans-serif;
+  background:var(--bg); color:var(--text);
+  direction:rtl; font-size:13px; line-height:1.55;
+}
+.demo-wrap{max-width:1180px;margin:0 auto;padding:32px 24px 80px;}
+.demo-banner{
+  background:#202020; color:#fff; padding:14px 22px; border-radius:var(--radius-lg);
+  margin-bottom:28px; font-size:13px; display:flex; align-items:center; gap:10px;
+}
+.demo-banner b{font-weight:700;}
+.section-label{
+  font-size:11px; font-weight:700; color:var(--text-3); text-transform:uppercase;
+  letter-spacing:.04em; margin:36px 0 12px;
+}
+
+/* ── Top app bar (Windows title-bar style) ── */
+.app-bar{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:14px 20px; display:flex; align-items:center; gap:14px; box-shadow:var(--shadow); margin-bottom:18px;
+}
+.app-bar-icon{width:32px;height:32px;border-radius:6px;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;}
+.app-bar-title{font-size:14px;font-weight:600;color:var(--text);}
+.app-bar-sub{font-size:11px;color:var(--text-3);}
+
+/* ── Home hero, flat panel instead of gradient ── */
+.home-panel{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:46px 32px; text-align:center; box-shadow:var(--shadow);
+}
+.home-mark{
+  width:56px;height:56px;border-radius:10px;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;margin:0 auto 18px;
+}
+.home-title{font-size:24px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.home-sub{font-size:13px;color:var(--text-2);max-width:460px;margin:0 auto 28px;}
+.home-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+
+.btn{
+  display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:var(--radius);
+  font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;border:1px solid transparent;
+  transition:background .12s,border-color .12s;
+}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:var(--accent-dark);}
+.btn-secondary{background:var(--surface);color:var(--text);border-color:var(--border-strong);}
+.btn-secondary:hover{background:var(--surface-2);}
+.btn-subtle{background:transparent;color:var(--accent);border-color:transparent;}
+.btn-subtle:hover{background:var(--accent-light);}
+
+.feature-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:28px;max-width:640px;margin-inline:auto;}
+.feature-tile{border:1px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center;background:var(--surface-2);}
+.feature-tile .ic{font-size:18px;margin-bottom:6px;color:var(--accent);}
+.feature-tile .ti{font-size:11.5px;font-weight:600;color:var(--text);}
+.feature-tile .de{font-size:10.5px;color:var(--text-3);margin-top:2px;}
+
+/* ── Cards / list ── */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+.x-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  box-shadow:var(--shadow); transition:border-color .12s, box-shadow .12s; cursor:pointer;}
+.x-card:hover{border-color:var(--border-strong); box-shadow:var(--shadow-md);}
+.x-card-top{padding:14px 16px 12px;}
+.x-tag{display:inline-block;font-size:10.5px;font-weight:600;color:var(--accent);background:var(--accent-light);
+  padding:2px 9px;border-radius:4px;margin-bottom:8px;}
+.x-name{font-size:14px;font-weight:700;color:var(--text);margin-bottom:3px;}
+.x-loc{font-size:11.5px;color:var(--text-3);}
+.x-mid{padding:9px 16px;border-top:1px solid var(--border);display:flex;gap:18px;}
+.x-stat{font-size:10.5px;color:var(--text-3);}
+.x-stat b{display:block;font-size:13px;color:var(--text);font-weight:700;}
+.x-actions{padding:9px 16px;border-top:1px solid var(--border);background:var(--surface-2);
+  display:flex;gap:6px;justify-content:flex-end;}
+
+/* ── Tabs (Windows segmented / underline) ── */
+.tabs{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  overflow:hidden; margin-bottom:16px;}
+.tab{padding:11px 18px;font-size:12.5px;font-weight:600;color:var(--text-2);background:none;border:none;
+  border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;}
+.tab:hover{color:var(--text); background:var(--surface-2);}
+.tab.active{color:var(--accent); border-bottom-color:var(--accent); background:var(--accent-light);}
+
+/* ── Detail header (flat, no gradient) ── */
+.detail-head{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:20px 22px; margin-bottom:16px;}
+.detail-type{font-size:10.5px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.03em;margin-bottom:6px;}
+.detail-name{font-size:20px;font-weight:700;color:var(--text);margin-bottom:10px;}
+.detail-meta{display:flex;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--text-2);}
+.detail-stats{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap;}
+.dstat{border:1px solid var(--border);border-radius:var(--radius);padding:8px 16px;text-align:center;background:var(--surface-2);min-width:70px;}
+.dstat b{display:block;font-size:17px;font-weight:700;color:var(--text);}
+.dstat span{font-size:10px;color:var(--text-3);}
+
+/* ── Table (Windows-style flat grid) ── */
+.x-table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow);}
+.x-table{width:100%;border-collapse:collapse;font-size:12px;}
+.x-table th{background:var(--surface-2);color:var(--text-2);font-weight:600;font-size:11px;
+  padding:9px 12px;text-align:right;border-bottom:1px solid var(--border);}
+.x-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text);}
+.x-table tr:last-child td{border-bottom:none;}
+.x-table tr:hover td{background:var(--surface-2);}
+.x-time{font-weight:700;color:var(--accent);direction:ltr;text-align:center;white-space:nowrap;}
+.x-order{width:24px;height:24px;border-radius:4px;background:var(--accent-light);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;}
+
+/* ── Badges, muted Windows system tones ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:4px;font-size:10.5px;font-weight:600;}
+.badge-blue{background:var(--accent-light);color:var(--accent);}
+.badge-green{background:var(--green-light);color:var(--green);}
+.badge-red{background:var(--red-light);color:var(--red);}
+.badge-amber{background:var(--amber-light);color:var(--amber);}
+.badge-gray{background:#f0f0f0;color:var(--text-2);}
+
+/* ── Export cards (flat, single accent on hover) ── */
+.export-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.exp-card{border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;text-align:center;
+  background:var(--surface); transition:border-color .12s; cursor:pointer;}
+.exp-card:hover{border-color:var(--accent);}
+.exp-ic{width:38px;height:38px;border-radius:8px;background:var(--accent-light);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:17px;margin:0 auto 12px;}
+.exp-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:5px;}
+.exp-desc{font-size:11px;color:var(--text-3);margin-bottom:14px;line-height:1.5;}
+
+/* swatch row */
+.swatch-row{display:flex;gap:10px;flex-wrap:wrap;}
+.swatch{width:90px;text-align:center;font-size:10.5px;color:var(--text-2);}
+.swatch .sq{width:90px;height:48px;border-radius:6px;border:1px solid var(--border);margin-bottom:5px;}
+</style>
+</head>
+<body>
+<div class="demo-wrap">
+
+  <div class="demo-banner">
+    🪟 <b>דמו עיצוב — סגנון Windows מקצועי.</b> זה לא משפיע על האפליקציה האמיתית. עברו על הסקשנים ותגידו אם זה הכיוון.
+  </div>
+
+  <div class="section-label">פלטת צבעים</div>
+  <div class="swatch-row">
+    <div class="swatch"><div class="sq" style="background:#f3f3f3"></div>רקע</div>
+    <div class="swatch"><div class="sq" style="background:#ffffff"></div>משטח (כרטיס)</div>
+    <div class="swatch"><div class="sq" style="background:#0067c0"></div>הדגשה (accent)</div>
+    <div class="swatch"><div class="sq" style="background:#1b1b1b"></div>טקסט עיקרי</div>
+    <div class="swatch"><div class="sq" style="background:#5c5c5c"></div>טקסט משני</div>
+    <div class="swatch"><div class="sq" style="background:#0f7b0f"></div>הצלחה</div>
+    <div class="swatch"><div class="sq" style="background:#c42b1c"></div>שגיאה</div>
+    <div class="swatch"><div class="sq" style="background:#9d5d00"></div>אזהרה</div>
+  </div>
+
+  <div class="section-label">סרגל עליון</div>
+  <div class="app-bar">
+    <div class="app-bar-icon">מ</div>
+    <div>
+      <div class="app-bar-title">מחולל תרגילים — מפקדת נפה</div>
+      <div class="app-bar-sub">כלי מקצועי לבניית תיקי תרגיל</div>
+    </div>
+    <div style="margin-right:auto;display:flex;gap:8px">
+      <button class="btn btn-secondary">⚙ הגדרות</button>
+      <button class="btn btn-primary">+ תרגיל חדש</button>
+    </div>
+  </div>
+
+  <div class="section-label">מסך בית</div>
+  <div class="home-panel">
+    <div class="home-mark">מ</div>
+    <div class="home-title">מחולל תרגילים</div>
+    <div class="home-sub">כלי מקצועי לבניית תיקי תרגיל מלאים למפקדות נפה, רשויות מקומיות, חונכים ובקרים</div>
+    <div class="home-actions">
+      <button class="btn btn-primary">+ צור תרגיל חדש</button>
+      <button class="btn btn-secondary">תרגילים שמורים</button>
+    </div>
+    <div class="feature-row">
+      <div class="feature-tile"><div class="ic">⚡</div><div class="ti">לוח הזרמות</div><div class="de">בנייה אוטומטית ועריכה</div></div>
+      <div class="feature-tile"><div class="ic">👥</div><div class="ti">סיפור אוכלוסייה</div><div class="de">תרחיש מלא ומפורט</div></div>
+      <div class="feature-tile"><div class="ic">📤</div><div class="ti">ייצוא מקצועי</div><div class="de">Word · Excel · PowerPoint</div></div>
+    </div>
+  </div>
+
+  <div class="section-label">רשימת תרגילים</div>
+  <div class="cards-grid">
+    <div class="x-card">
+      <div class="x-card-top">
+        <span class="x-tag">תרגיל מטה</span>
+        <div class="x-name">תרגיל רעידת אדמה — רחובות</div>
+        <div class="x-loc">📍 רחובות · 20.06.2026</div>
+      </div>
+      <div class="x-mid">
+        <div class="x-stat"><b>14</b>הזרמות</div>
+        <div class="x-stat"><b>4</b>שעות</div>
+        <div class="x-stat"><b>5</b>מכלולים</div>
+      </div>
+      <div class="x-actions">
+        <button class="btn btn-subtle btn-sm">שכפול</button>
+        <button class="btn btn-secondary btn-sm">פתח</button>
+      </div>
+    </div>
+    <div class="x-card">
+      <div class="x-card-top">
+        <span class="x-tag">תרגיל רשותי</span>
+        <div class="x-name">ירי רקטות — אשקלון</div>
+        <div class="x-loc">📍 אשקלון · 14.05.2026</div>
+      </div>
+      <div class="x-mid">
+        <div class="x-stat"><b>18</b>הזרמות</div>
+        <div class="x-stat"><b>3</b>שעות</div>
+        <div class="x-stat"><b>6</b>מכלולים</div>
+      </div>
+      <div class="x-actions">
+        <button class="btn btn-subtle btn-sm">שכפול</button>
+        <button class="btn btn-secondary btn-sm">פתח</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">תצוגת תרגיל — כותרת + לשוניות</div>
+  <div class="detail-head">
+    <div class="detail-type">תרגיל מטה · רעידת אדמה</div>
+    <div class="detail-name">תרגיל רעידת אדמה — רחובות</div>
+    <div class="detail-meta">
+      <span>📍 רחובות</span><span>📅 20.06.2026</span><span>⏰ 08:00–12:00</span><span>מורכבות בינונית</span>
+    </div>
+    <div class="detail-stats">
+      <div class="dstat"><b>14</b><span>הזרמות</span></div>
+      <div class="dstat"><b>4</b><span>שעות</span></div>
+      <div class="dstat"><b>120K</b><span>תושבים</span></div>
+      <div class="dstat"><b>5</b><span>מכלולים</span></div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active">⚡ לוח הזרמות</button>
+    <button class="tab">👥 סיפור אוכלוסייה</button>
+    <button class="tab">🆔 רשימת עוגן</button>
+    <button class="tab">🎖️ ציפיות ודגשים</button>
+    <button class="tab">📤 ייצוא</button>
+    <button class="tab">🎞️ מצגת</button>
+  </div>
+
+  <div class="x-table-wrap">
+    <table class="x-table">
+      <thead><tr><th>#</th><th>שעה</th><th>גורם מדווח</th><th>סוג</th><th>תוכן ההזרמה</th><th>אמינות</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><div class="x-order">1</div></td>
+          <td class="x-time">08:00</td>
+          <td style="font-weight:600">מנהל תרגיל</td>
+          <td><span class="badge badge-red">אירוע</span></td>
+          <td>פתיחת תרגיל — רעידת אדמה בעוצמה 6.2. כולם לעמדות!</td>
+          <td><span class="badge badge-green">A</span></td>
+        </tr>
+        <tr>
+          <td><div class="x-order">2</div></td>
+          <td class="x-time">08:08</td>
+          <td style="font-weight:600">מוקד 106</td>
+          <td><span class="badge badge-blue">דיווח</span></td>
+          <td>מציף דיווחים על מבנים קרסו ברח' הרצל 15 ורח' ויצמן 30</td>
+          <td><span class="badge badge-green">A</span></td>
+        </tr>
+        <tr>
+          <td><div class="x-order">3</div></td>
+          <td class="x-time">08:42</td>
+          <td style="font-weight:600">אזרחים</td>
+          <td><span class="badge badge-blue">דיווח</span></td>
+          <td>"כולם יצאו מהבניין" — סותר דיווח קודם על לכודים</td>
+          <td><span class="badge badge-amber">C</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section-label">לשונית ייצוא</div>
+  <div class="export-row">
+    <div class="exp-card">
+      <div class="exp-ic">📊</div>
+      <div class="exp-title">ייצוא לוח הזרמות</div>
+      <div class="exp-desc">קובץ Excel עם 2 גיליונות — תרגיל ובקר</div>
+      <button class="btn btn-secondary">הורד Excel</button>
+    </div>
+    <div class="exp-card">
+      <div class="exp-ic">📝</div>
+      <div class="exp-title">תיק תרגיל מלא</div>
+      <div class="exp-desc">מסמך Word מלא לפי תבנית רשמית</div>
+      <button class="btn btn-secondary">הורד Word</button>
+    </div>
+    <div class="exp-card">
+      <div class="exp-ic">🎞️</div>
+      <div class="exp-title">מצגת תדריך</div>
+      <div class="exp-desc">מצגת PowerPoint לתדריך התרגיל</div>
+      <button class="btn btn-secondary">הורד PPTX</button>
+    </div>
+  </div>
+
+  <div class="section-label">כפתורים</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn btn-primary">פעולה ראשית</button>
+    <button class="btn btn-secondary">פעולה משנית</button>
+    <button class="btn btn-subtle">פעולה עדינה</button>
+  </div>
+
+</div>
+</body>
+</html>
