@@ -738,6 +738,10 @@ const TEMPLATE = /* html */`
         <div class="feature-card"><div class="feature-icon">📊</div><div class="feature-title">ייצוא CSV</div><div class="feature-desc">לוח הזרמות לאקסל</div></div>
         <div class="feature-card"><div class="feature-icon">📝</div><div class="feature-title">ייצוא Word</div><div class="feature-desc">תיק תרגיל מלא להפצה</div></div>
       </div>
+      <div class="home-legal">
+        <p>כל הזכויות במערכת שמורות לדניאל אוחיון.</p>
+        <p>העלאת חומרים למערכת, לרבות בדיקת סיווגם והתאמתם לשימוש, הינה באחריות המשתמש בלבד. אין להעלות חומרים בניגוד לדין, להנחיות אבטחת מידע או לנהלים החלים על המשתמש.</p>
+      </div>
     </div>
   </div>
 
