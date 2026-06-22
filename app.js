@@ -304,6 +304,34 @@ const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const padZ = n => String(n).padStart(2,'0');
 const minsToTime = (m, base=0) => { const t=base+m; return `${padZ(Math.floor(t/60)%24)}:${padZ(t%60)}`; };
 
+/* ═══════════════════════════════════════════════════
+   REAL STREET DATA (סמל ישוב / רחוב, מבוסס קובץ רשמי)
+═══════════════════════════════════════════════════ */
+let STREETS_DATA = null;
+let _streetsLoadPromise = null;
+function loadStreetsData() {
+  if (!_streetsLoadPromise) {
+    _streetsLoadPromise = fetch('streets.json')
+      .then(r => r.ok ? r.json() : {})
+      .then(d => { STREETS_DATA = d; return d; })
+      .catch(() => { STREETS_DATA = {}; return {}; });
+  }
+  return _streetsLoadPromise;
+}
+function getCityStreets(location) {
+  if (!STREETS_DATA) return null;
+  const loc = (location || '').trim();
+  if (!loc) return null;
+  if (STREETS_DATA[loc]) return STREETS_DATA[loc];
+  const keys = Object.keys(STREETS_DATA);
+  const best = keys.find(k => k.startsWith(loc)) || keys.find(k => loc.startsWith(k)) || keys.find(k => k.includes(loc));
+  return best ? STREETS_DATA[best] : null;
+}
+function pickStreet(location) {
+  const real = getCityStreets(location);
+  return (real && real.length) ? pick(real) : pick(STREETS);
+}
+
 function fillVars(tpl, ctx) {
   return tpl.replace(/\{(\w+)\}/g, (_, k) => ctx[k] !== undefined ? ctx[k] : `[${k}]`);
 }
@@ -316,7 +344,7 @@ function buildCtx(draft) {
     loc: location, city,
     mag:  (4.5 + Math.random()*2).toFixed(1),
     depth: rnd(8,25),
-    street: pick(STREETS)+' '+rnd(1,60),
+    street: pickStreet(location)+' '+rnd(1,60),
     hosp: pick(HOSPITALS),
     cas_l: rnd(10,40)*m|0,  cas_s: rnd(2,10)*m|0,
     tot_c: rnd(15,60)*m|0,  tot_s: rnd(3,12)*m|0,
@@ -507,7 +535,7 @@ function generatePopulationStory(draft) {
   const summaryRows = [];
 
   for (let z=1; z<=zoneCount; z++) {
-    const street   = pick(STREETS);
+    const street   = pickStreet(location);
     const houseNum = rnd(1,80);
     const siteType = pick(siteTypes);
     const floors   = rnd(2,6);
@@ -621,7 +649,7 @@ function generateAnchorList(draft, count=20) {
       lastName,
       gender: isMale ? 'ז' : 'נ',
       isMinor: isMinor ? 'כן' : 'לא',
-      street: pick(STREETS),
+      street: pickStreet(draft.location),
       houseNum: rnd(1,120),
       entrance: Math.random() > .55 ? pick(['א','ב','ג','ד']) : '',
       apt: rnd(1,40),
@@ -686,6 +714,7 @@ function emptyDraft() {
     populationSize: 50000,
     populationStory: '',
     anchorList: [],
+    anchorCount: 20,
     injections: [],
     authorityExpect: 'ניהול שוטף ומתואם של האירוע, קבלת החלטות בזמן אמת, תיאום בין כל המכלולים ושמירה על רציפות תפקודית.',
     unitExpectations: [],
@@ -1018,9 +1047,13 @@ const TEMPLATE = /* html */`
           <textarea v-model="draft.populationStory" class="form-control" style="min-height:260px;font-size:13px;line-height:1.8"></textarea>
         </div>
         <div class="divider"></div>
-        <div class="story-section-title">🆔 רשימת עוגן ({{ draft.anchorList.length }} תושבים)</div>
-        <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-          <button class="btn btn-secondary btn-sm" @click="draft.anchorList=generateAnchorList(draft,20)">צור רשימה</button>
+        <div class="story-section-title">רשימת עוגן ({{ draft.anchorList.length }} תושבים)</div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-bottom:8px">
+          <label class="text-muted" style="display:flex;align-items:center;gap:6px">
+            גודל הרשימה:
+            <input type="number" v-model.number="draft.anchorCount" min="1" max="200" class="form-control" style="width:80px;padding:5px 8px" />
+          </label>
+          <button class="btn btn-secondary btn-sm" @click="draft.anchorList=generateAnchorList(draft,draft.anchorCount||20)">צור רשימה</button>
         </div>
         <div style="overflow-x:auto">
           <table class="anchor-table">
@@ -1673,6 +1706,7 @@ Vue.createApp({
 
     // Step 4→5 also generate story & anchors
     async runGenerate() {
+      await loadStreetsData();
       const settings = loadSettings();
       const apiKey = settings.apiKey;
       const useApi = !!(apiKey && settings.useApi);
@@ -1718,7 +1752,7 @@ Vue.createApp({
       }
 
       this.apiLoading = '';
-      if (!this.draft.anchorList.length) this.draft.anchorList = generateAnchorList(this.draft, 20);
+      if (!this.draft.anchorList.length) this.draft.anchorList = generateAnchorList(this.draft, this.draft.anchorCount||20);
       if (!this.draft.unitExpectations.length) this.draft.unitExpectations = generateExpectations(this.draft);
       if (!this.draft.mentorHighlights) {
         this.draft.mentorHighlights = `• ודא שהמשתתפים קולטים הזרמות בזמן ומגיבים בהתאם.\n• הדגש ניהול תמונת מצב מתעדכנת.\n• וודא שמתבצע תיאום בין-מכלולי מול כל אירוע.`;
@@ -1990,5 +2024,5 @@ Vue.createApp({
       }[s]||'badge-gray';
     },
   },
-  mounted() { this.loadData(); },
+  mounted() { this.loadData(); loadStreetsData(); },
 }).mount('#app');
