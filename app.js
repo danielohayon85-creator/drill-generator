@@ -8,42 +8,42 @@ const STORAGE_KEY = 'drill_gen_v1';
 const EXERCISE_TYPES = ['תרגיל מטה','תרגיל אתר הרס','תרגיל חבירה','תרגיל מודיעין אוכלוסייה','תרגיל רציפות תפקודית','תרגיל רשותי','תרגיל מוקד','תרגיל משולב'];
 
 const SCENARIOS = [
-  {id:'earthquake',  name:'רעידת אדמה',               icon:'🏚️'},
-  {id:'combat',      name:'ירי רקטות / פגיעת טיל',    icon:'🚀'},
-  {id:'mass_cas',    name:'פיגוע / אירוע רב נפגעים',  icon:'💥'},
-  {id:'fire',        name:'שריפה נרחבת',               icon:'🔥'},
-  {id:'flood',       name:'הצפה / שיטפון',             icon:'🌊'},
-  {id:'chemical',    name:'אירוע כימ"ב / חומ"ס',       icon:'☣️'},
-  {id:'traffic',     name:'אסון תחבורה / ר"נ',         icon:'🚗'},
-  {id:'infra',       name:'קריסת תשתיות',              icon:'🏗️'},
+  {id:'earthquake',  name:'רעידת אדמה',               icon:''},
+  {id:'combat',      name:'ירי רקטות / פגיעת טיל',    icon:''},
+  {id:'mass_cas',    name:'פיגוע / אירוע רב נפגעים',  icon:''},
+  {id:'fire',        name:'שריפה נרחבת',               icon:''},
+  {id:'flood',       name:'הצפה / שיטפון',             icon:''},
+  {id:'chemical',    name:'אירוע כימ"ב / חומ"ס',       icon:''},
+  {id:'traffic',     name:'אסון תחבורה / ר"נ',         icon:''},
+  {id:'infra',       name:'קריסת תשתיות',              icon:''},
 ];
 
 const SEC_SCENARIOS = [
-  {id:'road_block',   name:'חסימת כבישים',      icon:'🚧'},
-  {id:'power_cut',    name:'הפסקת חשמל',         icon:'⚡'},
-  {id:'comm_fail',    name:'קריסת תקשורת',       icon:'📡'},
-  {id:'hosp_load',    name:'עומס בתי חולים',     icon:'🏥'},
-  {id:'water_dmg',    name:'פגיעה תשתיות מים',   icon:'💧'},
-  {id:'force_short',  name:'מחסור בכוחות',       icon:'👥'},
-  {id:'media',        name:'לחץ תקשורתי',        icon:'📺'},
-  {id:'coord_fail',   name:'בעיות תיאום',        icon:'📞'},
+  {id:'road_block',   name:'חסימת כבישים',      icon:''},
+  {id:'power_cut',    name:'הפסקת חשמל',         icon:''},
+  {id:'comm_fail',    name:'קריסת תקשורת',       icon:''},
+  {id:'hosp_load',    name:'עומס בתי חולים',     icon:''},
+  {id:'water_dmg',    name:'פגיעה תשתיות מים',   icon:''},
+  {id:'force_short',  name:'מחסור בכוחות',       icon:''},
+  {id:'media',        name:'לחץ תקשורתי',        icon:''},
+  {id:'coord_fail',   name:'בעיות תיאום',        icon:''},
 ];
 
 const UNITS = [
-  {id:'home_front',   name:'פיקוד העורף',        icon:'🛡️'},
-  {id:'fire_dept',    name:'כב"א',               icon:'🚒'},
-  {id:'mda',          name:'מד"א',               icon:'🚑'},
-  {id:'police',       name:'משטרת ישראל',         icon:'👮'},
-  {id:'idf',          name:'כוחות צבאיים',        icon:'⭐'},
-  {id:'authority',    name:'רשות מקומית',         icon:'🏛️'},
-  {id:'water_corp',   name:'תאגיד מים',           icon:'💧'},
-  {id:'electric',     name:'חח"י',               icon:'⚡'},
-  {id:'hospital',     name:'בית חולים',           icon:'🏥'},
-  {id:'nafa_hq',      name:'מטה נפה',             icon:'🎖️'},
-  {id:'pop_officer',  name:'קצין אוכלוסייה',      icon:'👥'},
-  {id:'yaklr',        name:'יקל"ר',              icon:'📋'},
-  {id:'municipal',    name:'מטה עירוני',           icon:'🏢'},
-  {id:'social',       name:'רווחה / סוציאלי',     icon:'❤️'},
+  {id:'home_front',   name:'פיקוד העורף',        icon:''},
+  {id:'fire_dept',    name:'כב"א',               icon:''},
+  {id:'mda',          name:'מד"א',               icon:''},
+  {id:'police',       name:'משטרת ישראל',         icon:''},
+  {id:'idf',          name:'לוחמי חילוץ',         icon:''},
+  {id:'authority',    name:'רשות מקומית',         icon:''},
+  {id:'water_corp',   name:'תאגיד מים',           icon:''},
+  {id:'electric',     name:'חח"י',               icon:''},
+  {id:'hospital',     name:'בית חולים',           icon:''},
+  {id:'nafa_hq',      name:'מטה נפה',             icon:''},
+  {id:'pop_officer',  name:'קצין אוכלוסייה',      icon:''},
+  {id:'yaklr',        name:'יקל"ר',              icon:''},
+  {id:'municipal',    name:'מטה עירוני',           icon:''},
+  {id:'social',       name:'רווחה / סוציאלי',     icon:''},
 ];
 
 const INJ_TYPES = ['אירוע','דיווח','פקודה','עדכון','בקשה','מידע מודיעיני','הנחיה','אזהרה'];
@@ -485,7 +485,10 @@ function generatePopulationStory(draft) {
   };
   const intro = storyIntros[mainScenario] || storyIntros.earthquake;
 
-  const zoneCount = ({1:1,2:2,3:3})[complexity]||2;
+  // תרחישים עם נקודת פגיעה יחידה (טק"ק, דליפה, תאונת דרכים) מקבלים זירה אחת מורכבת;
+  // המורכבות מתבטאת בכמות נפגעים/אוכלוסייה בזירה (משתנה m), לא במספר זירות.
+  const SINGLE_SITE = ['combat','chemical','traffic','mass_cas'];
+  const zoneCount = SINGLE_SITE.includes(mainScenario) ? 1 : (({1:1,2:2,3:3})[complexity]||2);
   const siteTypes = ['בניין מגורים','מוסד ציבורי','בית פרטי','מפעל / מחסן','מוסד חינוכי','בניין משרדים','כולל / ישיבה'];
 
   const bgByScenario = (street, houseNum, siteType, popAtSite, floors) => ({
@@ -571,7 +574,7 @@ ${floorLines}
   const secText = secondaryScenarios.length
     ? '\n\nאתגרים משניים:\n' + secondaryScenarios.map(s=>{
         const obj = SEC_SCENARIOS.find(x=>x.id===s);
-        return `• ${obj?obj.icon+' '+obj.name:s}`;
+        return `• ${obj?obj.name:s}`;
       }).join('\n')
     : '';
 
@@ -707,21 +710,20 @@ const TEMPLATE = /* html */`
   <div v-if="view==='home'" class="home-wrap">
     <div class="home-panel">
       <div class="home-hero">
-        <div class="home-logo">🎯</div>
-        <h1 class="home-title">מחולל תרגילים</h1>
+          <h1 class="home-title">מחולל תרגילים</h1>
         <p class="home-sub">כלי מקצועי לבניית תיקי תרגיל מלאים למפקדות נפה, רשויות מקומיות, חונכים ובקרים</p>
       </div>
       <div class="home-actions">
         <button class="home-btn home-btn-primary" @click="startNew">
-          ➕ צור תרגיל חדש
+          צור תרגיל חדש
         </button>
         <button class="home-btn home-btn-secondary" @click="view='exercises'">
-          📂 תרגילים שמורים ({{ exercises.length }})
+          תרגילים שמורים ({{ exercises.length }})
         </button>
       </div>
       <div style="margin-top:16px;display:flex;justify-content:center;align-items:center;gap:12px">
         <button class="btn btn-ghost btn-sm" @click="showSettings=true" style="font-size:13px">
-          ⚙️ הגדרות API
+          הגדרות API
         </button>
         <span v-if="settings.apiKey && settings.useApi" style="font-size:12px;color:#0f7b0f;font-weight:600">
           ✓ Claude AI פעיל
@@ -731,12 +733,12 @@ const TEMPLATE = /* html */`
         </span>
       </div>
       <div class="home-features">
-        <div class="feature-card"><div class="feature-icon">📋</div><div class="feature-title">אשף שלבים</div><div class="feature-desc">8 תרחישים, עד 3 אתגרים משניים</div></div>
-        <div class="feature-card"><div class="feature-icon">⚡</div><div class="feature-title">הזרמות אוטומטיות</div><div class="feature-desc">לוח הזרמות מלא עם זמנים ומדווחים</div></div>
-        <div class="feature-card"><div class="feature-icon">👥</div><div class="feature-title">סיפור אוכלוסייה</div><div class="feature-desc">סיפור + רשימת עוגן סינתטית</div></div>
-        <div class="feature-card"><div class="feature-icon">🎖️</div><div class="feature-title">ציפיות ודגשים</div><div class="feature-desc">לכל מכלול, חונך ובקר</div></div>
-        <div class="feature-card"><div class="feature-icon">📊</div><div class="feature-title">ייצוא CSV</div><div class="feature-desc">לוח הזרמות לאקסל</div></div>
-        <div class="feature-card"><div class="feature-icon">📝</div><div class="feature-title">ייצוא Word</div><div class="feature-desc">תיק תרגיל מלא להפצה</div></div>
+        <div class="feature-card"><div class="feature-title">אשף שלבים</div><div class="feature-desc">8 תרחישים, עד 3 אתגרים משניים</div></div>
+        <div class="feature-card"><div class="feature-title">הזרמות אוטומטיות</div><div class="feature-desc">לוח הזרמות מלא עם זמנים ומדווחים</div></div>
+        <div class="feature-card"><div class="feature-title">סיפור אוכלוסייה</div><div class="feature-desc">סיפור + רשימת עוגן סינתטית</div></div>
+        <div class="feature-card"><div class="feature-title">ציפיות ודגשים</div><div class="feature-desc">לכל מכלול, חונך ובקר</div></div>
+        <div class="feature-card"><div class="feature-title">ייצוא CSV</div><div class="feature-desc">לוח הזרמות לאקסל</div></div>
+        <div class="feature-card"><div class="feature-title">ייצוא Word</div><div class="feature-desc">תיק תרגיל מלא להפצה</div></div>
       </div>
       <div class="home-legal">
         <p>כל הזכויות במערכת שמורות לדניאל אוחיון.</p>
@@ -749,27 +751,26 @@ const TEMPLATE = /* html */`
   <div v-else-if="view==='exercises'" class="page-wrap">
     <div class="page-header">
       <button class="back-btn" @click="view='home'">← חזרה</button>
-      <span class="page-title">📂 תרגילים שמורים</span>
-      <button class="btn btn-primary" @click="startNew">➕ חדש</button>
+      <span class="page-title">תרגילים שמורים</span>
+      <button class="btn btn-primary" @click="startNew">חדש</button>
     </div>
     <div v-if="exercises.length===0" class="card">
       <div class="empty-state">
-        <div class="empty-icon">📭</div>
         <div class="empty-title">אין תרגילים שמורים עדיין</div>
         <div class="empty-sub mb-4">צור תרגיל חדש כדי להתחיל</div>
-        <button class="btn btn-primary" @click="startNew">➕ צור תרגיל ראשון</button>
+        <button class="btn btn-primary" @click="startNew">צור תרגיל ראשון</button>
       </div>
     </div>
     <div v-else>
       <div style="margin-bottom:16px">
-        <input v-model="searchQ" class="form-control" placeholder="🔍 חיפוש לפי שם / מיקום..." style="max-width:340px" />
+        <input v-model="searchQ" class="form-control" placeholder="חיפוש לפי שם / מיקום..." style="max-width:340px" />
       </div>
       <div class="exercises-grid">
         <div v-for="ex in filteredExercises" :key="ex.id" class="ex-card">
           <div class="ex-card-top" @click="openExercise(ex)">
             <div class="ex-type-tag">{{ ex.exerciseType }}</div>
             <div class="ex-name">{{ ex.name || '(ללא שם)' }}</div>
-            <div class="ex-location">📍 {{ ex.location || '—' }} &nbsp;·&nbsp; 📅 {{ ex.date }}</div>
+            <div class="ex-location">{{ ex.location || '—' }} &nbsp;·&nbsp; {{ ex.date }}</div>
           </div>
           <div class="ex-card-mid">
             <div class="ex-stat"><strong>{{ ex.injections.length }}</strong> הזרמות</div>
@@ -778,8 +779,8 @@ const TEMPLATE = /* html */`
             <div class="ex-stat"><strong>{{ complexityLabel(ex.complexity) }}</strong></div>
           </div>
           <div class="ex-card-actions">
-            <button class="btn btn-secondary btn-sm" @click="duplicateExercise(ex.id)">📋 שכפל</button>
-            <button class="btn btn-danger btn-sm" @click="confirmDelete(ex.id)">🗑️</button>
+            <button class="btn btn-secondary btn-sm" @click="duplicateExercise(ex.id)">שכפל</button>
+            <button class="btn btn-danger btn-sm" @click="confirmDelete(ex.id)">מחק</button>
             <button class="btn btn-primary btn-sm" @click="openExercise(ex)">פתח ←</button>
           </div>
         </div>
@@ -791,7 +792,7 @@ const TEMPLATE = /* html */`
   <div v-else-if="view==='wizard'" class="page-wrap">
     <div class="page-header">
       <button class="back-btn" @click="confirmLeaveWizard">← יציאה</button>
-      <span class="page-title">✏️ יצירת תרגיל חדש</span>
+      <span class="page-title">יצירת תרגיל חדש</span>
     </div>
     <!-- Progress -->
     <div class="progress-wrap">
@@ -811,7 +812,7 @@ const TEMPLATE = /* html */`
     <!-- STEP 1: Basic info -->
     <div v-if="step===1" class="wizard-card">
       <div class="wizard-body">
-        <div class="story-section-title">📋 פרמטרים בסיסיים</div>
+        <div class="story-section-title">פרמטרים בסיסיים</div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">שם התרגיל *</label>
@@ -856,7 +857,7 @@ const TEMPLATE = /* html */`
           <div class="chip-grid">
             <div v-for="(lbl,i) in ['קלה (מכלול 1)','בינונית (מכלולים 2-3)','גבוהה (מלא)']" :key="i"
                  class="sel-chip" :class="draft.complexity===i+1?'selected':''" @click="draft.complexity=i+1">
-              {{ ['⭐','⭐⭐','⭐⭐⭐'][i] }} {{ lbl }}
+              {{ lbl }}
             </div>
           </div>
         </div>
@@ -870,26 +871,24 @@ const TEMPLATE = /* html */`
     <!-- STEP 2: Scenario -->
     <div v-if="step===2" class="wizard-card">
       <div class="wizard-body">
-        <div class="story-section-title">🎯 תרחיש ראשי</div>
+        <div class="story-section-title">תרחיש ראשי</div>
         <div class="scenario-grid mb-6">
           <div v-for="s in SCENARIOS" :key="s.id" class="scenario-card"
                :class="draft.mainScenario===s.id?'selected':''" @click="draft.mainScenario=s.id">
-            <div class="scenario-icon">{{ s.icon }}</div>
             <div class="scenario-name">{{ s.name }}</div>
           </div>
         </div>
         <div class="divider"></div>
-        <div class="story-section-title mt-4">➕ תרחישים משניים (עד 3)</div>
+        <div class="story-section-title mt-4">תרחישים משניים (עד 3)</div>
         <div class="chip-grid">
           <div v-for="s in SEC_SCENARIOS" :key="s.id"
                class="sel-chip" :class="draft.secondaryScenarios.includes(s.id)?'secondary-selected':''"
                @click="toggleSec(s.id)">
-            {{ s.icon }} {{ s.name }}
+            {{ s.name }}
             <span v-if="draft.secondaryScenarios.includes(s.id)" style="font-weight:800;color:#9d5d00">✓</span>
           </div>
         </div>
         <div v-if="draft.secondaryScenarios.length>0" class="info-box mt-3">
-          <span>ℹ️</span>
           <span>{{ draft.secondaryScenarios.length }} תרחיש/ים משניים נבחרו. הם ייכנסו ללוח ההזרמות כאתגרים בתוך האירוע הראשי.</span>
         </div>
       </div>
@@ -902,18 +901,17 @@ const TEMPLATE = /* html */`
     <!-- STEP 3: Units -->
     <div v-if="step===3" class="wizard-card">
       <div class="wizard-body">
-        <div class="story-section-title">👥 מכלולים משתתפים</div>
+        <div class="story-section-title">מכלולים משתתפים</div>
         <p class="text-muted mb-4">בחר את הגורמים שמשתתפים בתרגיל. הם ישמשו ליצירת ציפיות ודגשים.</p>
         <div class="chip-grid">
           <div v-for="u in UNITS" :key="u.id"
                class="sel-chip" :class="draft.units.includes(u.id)?'selected-green':''"
                @click="toggleUnit(u.id)">
-            {{ u.icon }} {{ u.name }}
+            {{ u.name }}
             <span v-if="draft.units.includes(u.id)" style="font-weight:800;color:#0f7b0f">✓</span>
           </div>
         </div>
         <div class="info-box mt-4" v-if="draft.units.length>0">
-          <span>✅</span>
           <span>{{ draft.units.length }} מכלולים נבחרו.</span>
         </div>
       </div>
@@ -926,7 +924,7 @@ const TEMPLATE = /* html */`
     <!-- STEP 4: Injection params -->
     <div v-if="step===4" class="wizard-card">
       <div class="wizard-body">
-        <div class="story-section-title">⚡ פרמטרי הזרמות</div>
+        <div class="story-section-title">פרמטרי הזרמות</div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">מספר הזרמות: <strong>{{ draft.injCount }}</strong></label>
@@ -956,8 +954,8 @@ const TEMPLATE = /* html */`
       <div class="wizard-footer">
         <button class="btn btn-secondary" @click="step--">← חזרה</button>
         <button class="btn btn-primary" @click="runGenerate">
-          <span v-if="settings.apiKey && settings.useApi">🤖 צור עם AI ←</span>
-          <span v-else>⚡ צור הזרמות ←</span>
+          <span v-if="settings.apiKey && settings.useApi">צור עם AI ←</span>
+          <span v-else>צור הזרמות ←</span>
         </button>
       </div>
     </div>
@@ -965,8 +963,8 @@ const TEMPLATE = /* html */`
     <!-- STEP 5: Edit injections -->
     <div v-if="step===5" class="wizard-card">
       <div class="card-header">
-        <span class="card-title">⚡ לוח הזרמות — {{ draft.injections.length }} הזרמות</span>
-        <button class="btn btn-secondary btn-sm" @click="runGenerate">🔄 ייצר מחדש</button>
+        <span class="card-title">לוח הזרמות — {{ draft.injections.length }} הזרמות</span>
+        <button class="btn btn-secondary btn-sm" @click="runGenerate">ייצר מחדש</button>
       </div>
       <div class="inj-table-wrap" style="max-height:460px;overflow-y:auto">
         <table class="inj-table">
@@ -996,7 +994,7 @@ const TEMPLATE = /* html */`
                 </select>
               </td>
               <td>
-                <button v-if="editingInjId!==inj.id" class="btn btn-ghost btn-sm" @click="editingInjId=inj.id">✏️</button>
+                <button v-if="editingInjId!==inj.id" class="btn btn-ghost btn-sm" @click="editingInjId=inj.id">ערוך</button>
                 <button v-else class="btn btn-success btn-sm" @click="editingInjId=null">✓</button>
               </td>
             </tr>
@@ -1012,17 +1010,17 @@ const TEMPLATE = /* html */`
     <!-- STEP 6: Population story -->
     <div v-if="step===6" class="wizard-card">
       <div class="wizard-body">
-        <div class="story-section-title">👥 סיפור האוכלוסייה</div>
+        <div class="story-section-title">סיפור האוכלוסייה</div>
         <div class="form-group">
           <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-            <button class="btn btn-secondary btn-sm" @click="draft.populationStory=generatePopulationStory(draft)">🔄 צור מחדש</button>
+            <button class="btn btn-secondary btn-sm" @click="draft.populationStory=generatePopulationStory(draft)">צור מחדש</button>
           </div>
           <textarea v-model="draft.populationStory" class="form-control" style="min-height:260px;font-size:13px;line-height:1.8"></textarea>
         </div>
         <div class="divider"></div>
         <div class="story-section-title">🆔 רשימת עוגן ({{ draft.anchorList.length }} תושבים)</div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-          <button class="btn btn-secondary btn-sm" @click="draft.anchorList=generateAnchorList(draft,20)">🔄 צור רשימה</button>
+          <button class="btn btn-secondary btn-sm" @click="draft.anchorList=generateAnchorList(draft,20)">צור רשימה</button>
         </div>
         <div style="overflow-x:auto">
           <table class="anchor-table">
@@ -1056,7 +1054,7 @@ const TEMPLATE = /* html */`
     <!-- STEP 7: Expectations -->
     <div v-if="step===7" class="wizard-card">
       <div class="wizard-body">
-        <div class="story-section-title">🎖️ ציפיות ודגשים</div>
+        <div class="story-section-title">ציפיות ודגשים</div>
         <div class="form-group">
           <label class="form-label">ציפיות מהרשות / מפקד (כולל)</label>
           <textarea v-model="draft.authorityExpect" class="form-control" style="min-height:80px"></textarea>
@@ -1065,7 +1063,7 @@ const TEMPLATE = /* html */`
         <div v-if="draft.unitExpectations.length>0">
           <div class="form-label mb-2">ציפיות לפי מכלול:</div>
           <div v-for="ue in draft.unitExpectations" :key="ue.unitId" class="form-group">
-            <label class="form-label" style="font-size:12px">{{ ue.unitIcon }} {{ ue.unitName }}</label>
+            <label class="form-label" style="font-size:12px">{{ ue.unitName }}</label>
             <input v-model="ue.expectation" class="form-control" />
           </div>
         </div>
@@ -1085,7 +1083,7 @@ const TEMPLATE = /* html */`
       </div>
       <div class="wizard-footer">
         <button class="btn btn-secondary" @click="step--">← חזרה</button>
-        <button class="btn btn-primary btn-lg" @click="finalizeExercise">💾 שמור תרגיל ←</button>
+        <button class="btn btn-primary btn-lg" @click="finalizeExercise">שמור תרגיל ←</button>
       </div>
     </div>
   </div>
@@ -1096,9 +1094,9 @@ const TEMPLATE = /* html */`
       <button class="back-btn" @click="view='exercises'">← חזרה לרשימה</button>
       <span class="page-title" style="flex:1">{{ current.name }}</span>
       <div class="btn-group">
-        <button class="btn btn-secondary btn-sm" @click="exportCSV">📊 CSV</button>
-        <button class="btn btn-secondary btn-sm" @click="exportWord">📝 Word</button>
-        <button class="btn btn-ghost btn-sm" @click="window.print()">🖨️</button>
+        <button class="btn btn-secondary btn-sm" @click="exportCSV">CSV</button>
+        <button class="btn btn-secondary btn-sm" @click="exportWord">Word</button>
+        <button class="btn btn-ghost btn-sm" @click="window.print()">הדפסה</button>
       </div>
     </div>
     <!-- Hero -->
@@ -1106,11 +1104,11 @@ const TEMPLATE = /* html */`
       <div class="detail-type">{{ current.exerciseType }}</div>
       <div class="detail-name">{{ current.name }}</div>
       <div class="detail-meta">
-        <div class="detail-meta-item">📍 {{ current.location }}</div>
-        <div class="detail-meta-item">📅 {{ current.date }}</div>
+        <div class="detail-meta-item">{{ current.location }}</div>
+        <div class="detail-meta-item">{{ current.date }}</div>
         <div class="detail-meta-item">⏰ {{ current.startTime }} ({{ current.durationHours }} שעות)</div>
-        <div class="detail-meta-item">{{ scenarioEmoji(current.mainScenario) }} {{ scenarioLabel(current.mainScenario) }}</div>
-        <div class="detail-meta-item">⭐ {{ complexityLabel(current.complexity) }}</div>
+        <div class="detail-meta-item">{{ scenarioLabel(current.mainScenario) }}</div>
+        <div class="detail-meta-item">{{ complexityLabel(current.complexity) }}</div>
       </div>
       <div class="detail-stats">
         <div class="detail-stat"><div class="detail-stat-num">{{ current.injections.length }}</div><div class="detail-stat-lbl">הזרמות</div></div>
@@ -1121,18 +1119,18 @@ const TEMPLATE = /* html */`
     </div>
     <!-- Tabs -->
     <div class="detail-tabs">
-      <button class="dtab" :class="detailTab==='injections'?'active':''" @click="detailTab='injections'">⚡ לוח הזרמות</button>
-      <button class="dtab" :class="detailTab==='story'?'active':''" @click="detailTab='story'">👥 סיפור אוכלוסייה</button>
+      <button class="dtab" :class="detailTab==='injections'?'active':''" @click="detailTab='injections'">לוח הזרמות</button>
+      <button class="dtab" :class="detailTab==='story'?'active':''" @click="detailTab='story'">סיפור אוכלוסייה</button>
       <button class="dtab" :class="detailTab==='anchors'?'active':''" @click="detailTab='anchors'">🆔 רשימת עוגן</button>
-      <button class="dtab" :class="detailTab==='expect'?'active':''" @click="detailTab='expect'">🎖️ ציפיות ודגשים</button>
-      <button class="dtab" :class="detailTab==='export'?'active':''" @click="detailTab='export'">📤 ייצוא</button>
-      <button class="dtab" :class="detailTab==='pptx'?'active':''" @click="detailTab='pptx'">🎞️ מצגת</button>
+      <button class="dtab" :class="detailTab==='expect'?'active':''" @click="detailTab='expect'">ציפיות ודגשים</button>
+      <button class="dtab" :class="detailTab==='export'?'active':''" @click="detailTab='export'">ייצוא</button>
+      <button class="dtab" :class="detailTab==='pptx'?'active':''" @click="detailTab='pptx'">מצגת</button>
     </div>
 
     <!-- Tab: Injections -->
     <div v-if="detailTab==='injections'" class="card">
       <div class="card-header">
-        <span class="card-title">⚡ לוח הזרמות — {{ current.injections.length }} הזרמות</span>
+        <span class="card-title">לוח הזרמות — {{ current.injections.length }} הזרמות</span>
         <div class="btn-group">
           <span class="text-muted" style="align-self:center">{{ current.startTime }} — {{ endTime }}</span>
         </div>
@@ -1161,7 +1159,7 @@ const TEMPLATE = /* html */`
 
     <!-- Tab: Story -->
     <div v-if="detailTab==='story'" class="card">
-      <div class="card-header"><span class="card-title">👥 סיפור האוכלוסייה</span></div>
+      <div class="card-header"><span class="card-title">סיפור האוכלוסייה</span></div>
       <div class="card-body">
         <pre class="story-text">{{ current.populationStory }}</pre>
       </div>
@@ -1198,25 +1196,25 @@ const TEMPLATE = /* html */`
     <!-- Tab: Expectations -->
     <div v-if="detailTab==='expect'">
       <div class="exp-section">
-        <div class="exp-header">🏛️ ציפיות מהרשות (כולל)</div>
+        <div class="exp-header">ציפיות מהרשות (כולל)</div>
         <div class="exp-body"><p style="line-height:1.8">{{ current.authorityExpect }}</p></div>
       </div>
       <div v-if="current.unitExpectations.length>0" class="exp-section">
-        <div class="exp-header">👥 ציפיות לפי מכלול</div>
+        <div class="exp-header">ציפיות לפי מכלול</div>
         <div class="exp-body">
           <div v-for="ue in current.unitExpectations" :key="ue.unitId" class="exp-unit-row">
-            <div class="exp-unit-name">{{ ue.unitIcon }} {{ ue.unitName }}</div>
+            <div class="exp-unit-name">{{ ue.unitName }}</div>
             <div class="exp-unit-text">{{ ue.expectation }}</div>
           </div>
         </div>
       </div>
       <div class="grid-2">
         <div class="exp-section" v-if="current.mentorHighlights">
-          <div class="exp-header">🎓 דגשי חונך</div>
+          <div class="exp-header">דגשי חונך</div>
           <div class="exp-body"><pre class="story-text" style="font-size:13px">{{ current.mentorHighlights }}</pre></div>
         </div>
         <div class="exp-section" v-if="current.controllerHighlights">
-          <div class="exp-header">🔍 דגשי בקר</div>
+          <div class="exp-header">דגשי בקר</div>
           <div class="exp-body"><pre class="story-text" style="font-size:13px">{{ current.controllerHighlights }}</pre></div>
         </div>
       </div>
@@ -1227,10 +1225,10 @@ const TEMPLATE = /* html */`
     <div v-if="detailTab==='pptx'">
       <div class="card">
         <div class="card-header">
-          <span class="card-title">🎞️ מצגת תדריך לתרגיל</span>
+          <span class="card-title">מצגת תדריך לתרגיל</span>
           <button class="btn btn-primary" @click="exportPPTX" :disabled="pptxLoading">
             <span v-if="pptxLoading">⏳ מייצר...</span>
-            <span v-else>📥 הורד PowerPoint</span>
+            <span v-else>הורד PowerPoint</span>
           </button>
         </div>
         <div class="card-body">
@@ -1249,7 +1247,7 @@ const TEMPLATE = /* html */`
             <div class="slide-row">
               <span class="slide-num">3</span>
               <span class="slide-name">תרחיש</span>
-              <span class="text-muted slide-info">{{ scenarioEmoji(current.mainScenario) }} {{ scenarioLabel(current.mainScenario) }}</span>
+              <span class="text-muted slide-info">{{ scenarioLabel(current.mainScenario) }}</span>
             </div>
             <div class="slide-row">
               <span class="slide-num">4</span>
@@ -1282,7 +1280,7 @@ const TEMPLATE = /* html */`
               <span class="text-muted slide-info">בהצלחה לכולם!</span>
             </div>
           </div>
-          <div v-if="pptxError" class="warn-box" style="margin-top:14px;background:var(--red-light);color:var(--red)">⚠️ {{ pptxError }}</div>
+          <div v-if="pptxError" class="warn-box" style="margin-top:14px;background:var(--red-light);color:var(--red)">{{ pptxError }}</div>
         </div>
       </div>
     </div>
@@ -1290,29 +1288,29 @@ const TEMPLATE = /* html */`
     <div v-if="detailTab==='export'">
       <div class="export-grid">
         <div class="export-card" @click="exportCSV">
-          <div class="export-icon">📊</div>
+          
           <div class="export-title">ייצוא לוח הזרמות — CSV</div>
           <div class="export-desc">קובץ שניתן לפתוח ב-Excel. מכיל את כל ההזרמות עם שעות, מדווחים ותוכן.</div>
-          <button class="btn btn-primary">📥 הורד CSV</button>
+          <button class="btn btn-primary">הורד CSV</button>
         </div>
         <div class="export-card" @click="exportWord">
-          <div class="export-icon">📝</div>
+          
           <div class="export-title">ייצוא תיק תרגיל מלא — Word</div>
           <div class="export-desc">מסמך Word מלא עם כל תוכן התיק: תרחיש, סיפור אוכלוסייה, הזרמות, ציפיות ודגשים.</div>
-          <button class="btn btn-purple">📥 הורד Word</button>
+          <button class="btn btn-purple">הורד Word</button>
         </div>
         <div class="export-card" @click="exportPPTX">
-          <div class="export-icon">🎞️</div>
+          
           <div class="export-title">מצגת תדריך — PowerPoint</div>
           <div class="export-desc">מצגת PowerPoint מעוצבת לתדריך התרגיל: שקפי כותרת, תרחיש, לוח הזרמות וציפיות.</div>
-          <button class="btn btn-purple">📥 הורד PPTX</button>
+          <button class="btn btn-purple">הורד PPTX</button>
         </div>
       </div>
       <div class="card mt-4">
-        <div class="card-header"><span class="card-title">📋 תיק תרגיל — תצוגה מקדימה</span></div>
+        <div class="card-header"><span class="card-title">תיק תרגיל — תצוגה מקדימה</span></div>
         <div class="card-body">
           <div class="story-section">
-            <div class="story-section-title">📌 פרטי התרגיל</div>
+            <div class="story-section-title">פרטי התרגיל</div>
             <div class="story-text">שם: {{ current.name }}
 תאריך: {{ current.date }}   |   מיקום: {{ current.location }}
 סוג: {{ current.exerciseType }}   |   תרחיש: {{ scenarioLabel(current.mainScenario) }}
@@ -1327,7 +1325,6 @@ const TEMPLATE = /* html */`
   <!-- API loading overlay -->
   <div v-if="apiLoading" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center">
     <div style="background:white;border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:36px 48px;text-align:center;max-width:340px;box-shadow:var(--shadow-lg)">
-      <div style="font-size:32px;margin-bottom:12px">🤖</div>
       <div style="font-weight:700;font-size:16px;margin-bottom:8px">Claude AI עובד...</div>
       <div style="color:var(--gray-600);font-size:13px">{{ apiLoading }}</div>
       <div style="margin-top:18px;display:flex;gap:6px;justify-content:center">
@@ -1342,12 +1339,11 @@ const TEMPLATE = /* html */`
   <div v-if="showSettings" class="modal-backdrop" @click.self="showSettings=false">
     <div class="modal" style="max-width:480px">
       <div class="modal-header">
-        <span class="modal-title">⚙️ הגדרות Claude API</span>
+        <span class="modal-title">הגדרות Claude API</span>
         <button class="modal-close" @click="showSettings=false">✕</button>
       </div>
       <div class="modal-body">
         <div class="info-box mb-4">
-          <span>ℹ️</span>
           <span>עם API key תקני Claude יוצר הזרמות וסיפורי אוכלוסייה איכותיים יותר. ללא מפתח — המערכת עובדת עם תבניות.</span>
         </div>
         <div class="form-group">
@@ -1366,7 +1362,7 @@ const TEMPLATE = /* html */`
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="showSettings=false">ביטול</button>
-        <button class="btn btn-primary" @click="saveSettingsData">💾 שמור הגדרות</button>
+        <button class="btn btn-primary" @click="saveSettingsData">שמור הגדרות</button>
       </div>
     </div>
   </div>
@@ -1374,7 +1370,7 @@ const TEMPLATE = /* html */`
   <!-- Delete confirm modal -->
   <div v-if="showDeleteModal" class="modal-backdrop" @click.self="showDeleteModal=false">
     <div class="modal modal-sm">
-      <div class="modal-header"><span class="modal-title">🗑️ מחיקת תרגיל</span><button class="modal-close" @click="showDeleteModal=false">✕</button></div>
+      <div class="modal-header"><span class="modal-title">מחיקת תרגיל</span><button class="modal-close" @click="showDeleteModal=false">✕</button></div>
       <div class="modal-body"><p>האם למחוק את התרגיל הזה לצמיתות? לא ניתן לשחזר.</p></div>
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="showDeleteModal=false">ביטול</button>
@@ -1389,7 +1385,7 @@ const TEMPLATE = /* html */`
    POWERPOINT EXPORT
 ═══════════════════════════════════════════════════ */
 async function doExportPPTX(ex, helpers) {
-  const { endTime, getScenarioLabel, getScenarioEmoji, getComplexityLabel } = helpers;
+  const { endTime, getScenarioLabel, getComplexityLabel } = helpers;
 
   const pptx = new PptxGenJS();
   pptx.layout = 'LAYOUT_16x9';
@@ -1409,7 +1405,6 @@ async function doExportPPTX(ex, helpers) {
   const [startH, startM] = (ex.startTime || '08:00').split(':').map(Number);
   const startBase = startH * 60 + startM;
   const sLabel = getScenarioLabel(ex.mainScenario);
-  const sEmoji = getScenarioEmoji(ex.mainScenario);
   const cLabel = getComplexityLabel(ex.complexity);
 
   function hdr(s, title) {
@@ -1423,10 +1418,9 @@ async function doExportPPTX(ex, helpers) {
     const s = pptx.addSlide();
     s.background = {color: C.navy};
     s.addShape(pptx.shapes.RECTANGLE, { x:0, y:0, w:0.25, h:H, fill:{color:C.amber}, line:{type:'none'} });
-    s.addText(sEmoji, { x:8.2, y:0.5, w:1.5, h:1.2, fontSize:54, align:'center', valign:'middle' });
     s.addText(ex.exerciseType, { x:0.5, y:0.85, w:7.5, h:0.5, fontSize:13, color:C.lblue, align:'right', rtlMode:true });
     s.addText(ex.name, { x:0.5, y:1.4, w:9.0, h:2.0, fontSize:34, bold:true, color:C.white, align:'right', rtlMode:true, valign:'middle' });
-    s.addText(`📍 ${ex.location}   |   📅 ${ex.date}   |   ⏰ ${ex.startTime}–${endTime}`, { x:0.5, y:3.65, w:9.0, h:0.5, fontSize:13, color:C.lblue, align:'right', rtlMode:true });
+    s.addText(`${ex.location}   |   ${ex.date}   |   ${ex.startTime}–${endTime}`, { x:0.5, y:3.65, w:9.0, h:0.5, fontSize:13, color:C.lblue, align:'right', rtlMode:true });
     s.addText(`${sLabel}   ·   מורכבות: ${cLabel}   ·   ${durationHours} שעות`, { x:0.5, y:4.2, w:9.0, h:0.45, fontSize:12, color:C.white, align:'right', rtlMode:true });
     s.addShape(pptx.shapes.RECTANGLE, { x:0, y:H-0.45, w:W, h:0.45, fill:{color:C.navy2}, line:{type:'none'} });
     s.addText('מחולל תרגילים — מפקדת נפה  |  לשימוש פנימי בלבד', { x:0, y:H-0.45, w:W, h:0.45, fontSize:9, color:C.muted, align:'center', valign:'middle' });
@@ -1443,7 +1437,7 @@ async function doExportPPTX(ex, helpers) {
       [{text:'תאריך', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}, {text:ex.date, options:{align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}],
       [{text:'מיקום / רשות', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}, {text:ex.location, options:{align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}],
       [{text:'סוג תרגיל', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}, {text:ex.exerciseType, options:{align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}],
-      [{text:'תרחיש', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}, {text:`${sEmoji} ${sLabel}`, options:{align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}],
+      [{text:'תרחיש', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}, {text:sLabel, options:{align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}],
       [{text:'שעות תרגיל', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}, {text:`${ex.startTime}–${endTime} (${durationHours} שעות)`, options:{align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}],
       [{text:'מורכבות', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}, {text:cLabel, options:{align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}],
       [{text:'מכלולים', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}, {text:unitNames, options:{align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}],
@@ -1457,10 +1451,9 @@ async function doExportPPTX(ex, helpers) {
     s.background = {color: C.navy};
     s.addShape(pptx.shapes.RECTANGLE, { x:0, y:0, w:0.25, h:H, fill:{color:C.amber}, line:{type:'none'} });
     s.addText('תרחיש התרגיל', { x:0.45, y:0.2, w:9.4, h:0.65, fontSize:15, color:C.lblue, align:'right', rtlMode:true });
-    s.addText(sEmoji, { x:3.5, y:0.85, w:3.0, h:1.8, fontSize:72, align:'center', valign:'middle' });
-    s.addText(sLabel, { x:0.5, y:2.65, w:9.0, h:0.9, fontSize:30, bold:true, color:C.white, align:'center', rtlMode:true });
+    s.addText(sLabel, { x:0.5, y:1.8, w:9.0, h:0.9, fontSize:32, bold:true, color:C.white, align:'center', rtlMode:true });
     if (ex.secondaryScenarios && ex.secondaryScenarios.length) {
-      const secTxt = ex.secondaryScenarios.map(id => { const sc=SEC_SCENARIOS.find(x=>x.id===id); return sc?`${sc.icon} ${sc.name}`:id; }).join('    ');
+      const secTxt = ex.secondaryScenarios.map(id => { const sc=SEC_SCENARIOS.find(x=>x.id===id); return sc?sc.name:id; }).join('    ');
       s.addText('תרחישים משניים:', { x:0.5, y:3.7, w:9.0, h:0.4, fontSize:12, color:C.muted, align:'right', rtlMode:true });
       s.addText(secTxt, { x:0.5, y:4.1, w:9.0, h:0.55, fontSize:15, color:C.lblue, align:'center', rtlMode:true });
     }
@@ -1652,7 +1645,7 @@ Vue.createApp({
       const idx = this.exercises.findIndex(e=>e.id===ex.id);
       if (idx>=0) this.exercises.splice(idx,1,ex); else this.exercises.push(ex);
       this.saveData();
-      this.toast('התרגיל נשמר בהצלחה! ✓','success');
+      this.toast('התרגיל נשמר בהצלחה!','success');
       this.current = ex;
       this.detailTab = 'injections';
       this.view = 'detail';
@@ -1701,7 +1694,7 @@ Vue.createApp({
             reliability: inj.reliability || 'B',
             notes: '',
           }));
-          this.toast('הזרמות נוצרו בהצלחה עם AI ✓', 'success');
+          this.toast('הזרמות נוצרו בהצלחה עם AI', 'success');
         } catch(e) {
           this.toast(`שגיאת API — עובר לתבניות: ${e.message}`, 'warning');
           this.draft.injections = generateInjections(this.draft);
@@ -1765,167 +1758,179 @@ Vue.createApp({
       XLSX.utils.book_append_sheet(wb, wsDrill, 'לוח הזרמות — תרגיל');
       XLSX.utils.book_append_sheet(wb, wsCtrl, 'לוח הזרמות — בקר');
       XLSX.writeFile(wb, `הזרמות_${ex.name||'תרגיל'}.xlsx`);
-      this.toast('יוצא ל-Excel — 2 גרסאות ✓','success');
+      this.toast('יוצא ל-Excel — 2 גרסאות','success');
     },
 
-    exportWord() {
+    async exportWord() {
       if (!this.current) return;
+      if (typeof docx === 'undefined') {
+        this.toast('ספריית docx לא נטענה. בדוק חיבור אינטרנט ורענן.','error');
+        return;
+      }
       const ex = this.current;
-      const secNames = ex.secondaryScenarios.map(id=>{
-        const s = SEC_SCENARIOS.find(x=>x.id===id); return s?s.name:id;
-      }).join(', ');
+      const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, WidthType, BorderStyle, ShadingType } = docx;
+
+      const COL = { primary:'0067C0', dark:'1B1B1B', muted:'5C5C5C', light:'F3F3F3', border:'D1D1D1', green:'0F7B0F', amber:'9D5D00', red:'C42B1C', white:'FFFFFF' };
+      const TYPE_BG = {'אירוע':'FDE7E9','דיווח':'E8F1FB','פקודה':'EEF0FC','עדכון':'E6F4E6','בקשה':'FDF0DB','מידע מודיעיני':'F3F3F3','הנחיה':'E8F1FB','אזהרה':'FDF0DB'};
+
+      const txt = (text, opts={}) => new TextRun({ text: String(text ?? ''), rightToLeft: true, ...opts });
+      const para = (text, opts={}) => {
+        const { bold, size, color, italics, align, ...rest } = opts;
+        return new Paragraph({
+          bidirectional: true,
+          alignment: align || AlignmentType.RIGHT,
+          children: [txt(text, { bold, size, color, italics })],
+          ...rest,
+        });
+      };
+      const cell = (text, opts={}) => {
+        const { bold, size, color, align, fill, width } = opts;
+        return new TableCell({
+          width: width ? { size: width, type: WidthType.DXA } : undefined,
+          shading: fill ? { fill } : undefined,
+          children: [new Paragraph({
+            bidirectional: true,
+            alignment: align || AlignmentType.RIGHT,
+            children: [txt(text, { bold, size: size ?? 18, color })],
+          })],
+        });
+      };
+      const headerCell = (text, width) => cell(text, { bold:true, color:COL.white, fill:COL.primary, width, align:AlignmentType.RIGHT, size:20 });
+      const row = cells => new TableRow({ children: cells });
+      const table = rows => new Table({ rows });
+      const sectionHeading = text => new Paragraph({
+        bidirectional: true, alignment: AlignmentType.RIGHT,
+        shading: { type: ShadingType.CLEAR, color:'auto', fill: 'EFF6FF' },
+        border: { right: { style: BorderStyle.SINGLE, size: 24, color: COL.primary } },
+        spacing: { before: 300, after: 150 },
+        children: [txt(text, { bold:true, size:28, color:COL.primary })],
+      });
+      const subHeading = text => new Paragraph({
+        bidirectional: true, alignment: AlignmentType.RIGHT, spacing:{before:200,after:100},
+        children:[txt(text,{bold:true,size:22,color:COL.dark})],
+      });
+      const bodyText = (text, opts={}) => para(text, { size:20, color:COL.dark, spacing:{after:80}, ...opts });
+      const preBlock = text => (text||'').split('\n').map(line => para(line || ' ', { size:18, color:COL.dark, spacing:{after:20} }));
+      const pageBreak = () => new Paragraph({ pageBreakBefore:true, children:[] });
+
+      const secNames = ex.secondaryScenarios.map(id=>{const s=SEC_SCENARIOS.find(x=>x.id===id);return s?s.name:id;}).join(', ') || '—';
       const unitNames = ex.units.map(id=>{const u=UNITS.find(x=>x.id===id);return u?u.name:id;}).join(', ') || '—';
 
-      // Injection table — 3-column drill version (matches real exercise files)
-      const injRowsDrill = ex.injections.map(inj=>
-        `<tr>
-          <td style="text-align:center;width:55pt;font-size:11pt;direction:ltr"><b>${inj.time}</b></td>
-          <td style="width:auto;font-size:10pt;line-height:1.5">${inj.content}</td>
-          <td style="width:85pt;font-size:10pt;font-weight:600">${inj.reporter}</td>
-        </tr>`
-      ).join('');
+      const children = [];
 
-      // Injection table — controller version (full)
-      const injRowsCtrl = ex.injections.map(inj=>
-        `<tr>
-          <td style="text-align:center;width:15pt">${inj.order}</td>
-          <td style="text-align:center;width:45pt;direction:ltr">${inj.time}</td>
-          <td style="width:75pt;font-weight:600">${inj.reporter}</td>
-          <td style="width:55pt"><span style="background:${this.injTypeBgColor(inj.type)};padding:1px 4px;border-radius:3px;font-size:8pt">${inj.type}</span></td>
-          <td>${inj.content}</td>
-          <td style="color:#6b7280;font-size:9pt">${inj.expectedAction}</td>
-          <td style="text-align:center;font-weight:700;color:${this.relColor(inj.reliability)}">${inj.reliability}</td>
-        </tr>`
-      ).join('');
+      // Cover
+      children.push(
+        new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{before:600,after:200}, children:[txt('תיק תרגיל',{bold:true,size:56,color:COL.primary})] }),
+        new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:300}, border:{bottom:{style:BorderStyle.SINGLE,size:12,color:COL.primary}}, children:[txt(ex.name,{size:32,color:COL.dark})] }),
+        new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:80}, children:[txt(`${ex.location}  ·  ${ex.date}  ·  ${ex.startTime}–${this.endTime}`,{size:22,color:COL.muted})] }),
+        new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:80}, children:[txt(`${ex.exerciseType}  ·  ${this.scenarioLabel(ex.mainScenario)}`,{size:22,color:COL.muted})] }),
+        new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:600}, children:[txt(`${this.complexityLabel(ex.complexity)}  ·  ${ex.populationSize.toLocaleString('he-IL')} תושבים`,{size:22,color:COL.muted})] }),
+        new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, children:[txt(`הופק: ${new Date().toLocaleDateString('he-IL')}  |  מחולל תרגילים — מפקדת נפה`,{size:16,color:COL.muted})] }),
+      );
 
-      const anchorRows = ex.anchorList.map((a,i)=>
-        `<tr>
-          <td style="text-align:center;color:#9ca3af">${i+1}</td>
-          <td style="font-weight:600">${a.lastName||''}</td>
-          <td>${a.firstName||a.name||''}</td>
-          <td style="text-align:center">${a.gender||''}</td>
-          <td style="direction:ltr;font-size:9pt">${a.idNum}</td>
-          <td style="text-align:center">${a.isMinor||''}</td>
-          <td>${a.street||''}</td>
-          <td>${a.houseNum||''}</td>
-          <td>${a.entrance||''}</td>
-          <td>${a.apt||''}</td>
-          <td style="direction:ltr;font-size:9pt">${a.phone}</td>
-          <td><b>${a.status}</b></td>
-        </tr>`
-      ).join('');
+      // 1. Details
+      children.push(sectionHeading('1. פרטי התרגיל'));
+      children.push(table([
+        row([cell('שם התרגיל',{bold:true,width:1800}), cell(ex.name,{width:3200}), cell('תאריך',{bold:true,width:1400}), cell(ex.date,{width:2600})]),
+        row([cell('מיקום / רשות',{bold:true,width:1800}), cell(ex.location,{width:3200}), cell('סוג תרגיל',{bold:true,width:1400}), cell(ex.exerciseType,{width:2600})]),
+        row([cell('תרחיש ראשי',{bold:true,width:1800}), cell(this.scenarioLabel(ex.mainScenario),{width:3200}), cell('תרחישים משניים',{bold:true,width:1400}), cell(secNames,{width:2600})]),
+        row([cell('שעות תרגיל',{bold:true,width:1800}), cell(`${ex.startTime}–${this.endTime} (${ex.durationHours} שעות)`,{width:3200}), cell('מורכבות',{bold:true,width:1400}), cell(this.complexityLabel(ex.complexity),{width:2600})]),
+        row([cell('גודל אוכלוסייה',{bold:true,width:1800}), cell(`${ex.populationSize.toLocaleString('he-IL')} תושבים`,{width:3200}), cell('מכלולים',{bold:true,width:1400}), cell(unitNames,{width:2600})]),
+      ]));
 
-      const unitExpRows = ex.unitExpectations.map(ue=>
-        `<tr><td style="font-weight:600;width:120pt">${ue.unitIcon} ${ue.unitName}</td><td>${ue.expectation}</td></tr>`
-      ).join('');
+      // 2. Population story
+      children.push(pageBreak());
+      children.push(sectionHeading('2. סיפור האוכלוסייה'));
+      children.push(...preBlock(ex.populationStory));
 
-      const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset="UTF-8">
-<style>
-  body { font-family: Arial, 'David', sans-serif; direction: rtl; font-size:11pt; margin:2cm; }
-  .cover { text-align:center; padding:40pt 0; border-bottom:3px solid #1e3a8a; margin-bottom:24pt; }
-  .cover-title { font-size:24pt; font-weight:900; color:#1e3a8a; margin-bottom:8pt; }
-  .cover-sub { font-size:14pt; color:#374151; margin-bottom:4pt; }
-  .cover-meta { font-size:11pt; color:#6b7280; margin-top:16pt; }
-  h2 { color:#1e3a8a; font-size:14pt; margin-top:22pt; margin-bottom:6pt;
-       border-right:5px solid #1e3a8a; padding-right:8pt; background:#eff6ff; padding:6pt 10pt; }
-  h3 { color:#374151; font-size:11pt; margin-top:14pt; }
-  table { width:100%; border-collapse:collapse; font-size:10pt; margin-top:6pt; }
-  th { background:#1e3a8a; color:white; padding:7px 8px; text-align:right; font-size:10pt; }
-  td { border:1px solid #d1d5db; padding:5px 7px; vertical-align:top; }
-  tr:nth-child(even) td { background:#f8fafc; }
-  .meta-table td { border:none; padding:3px 8px; }
-  .meta-table tr:nth-child(even) td { background:transparent; }
-  pre { font-family: Arial, 'David', sans-serif; white-space:pre-wrap; font-size:10pt; line-height:1.7;
-        background:#f9fafb; border:1px solid #e5e7eb; padding:10pt; }
-  .page-break { page-break-before:always; }
-  .section-label { color:#6b7280; font-size:9pt; }
-</style>
-</head><body>
+      // 3. Injection board — drill version
+      children.push(pageBreak());
+      children.push(sectionHeading(`3. לוח הזרמות — גרסת תרגיל (${ex.injections.length} הזרמות)`));
+      children.push(bodyText('לשימוש בזמן התרגיל בלבד', { italics:true, size:18, color:COL.muted }));
+      children.push(table([
+        row([headerCell('שעה',800), headerCell('דיווח',5500), headerCell('גורם מדווח',1700)]),
+        ...ex.injections.map((inj,i)=>{ const bg = i%2 ? COL.light : COL.white; return row([
+          cell(inj.time, {align:AlignmentType.CENTER, bold:true, color:COL.primary, fill:bg, width:800}),
+          cell(inj.content, {fill:bg, width:5500}),
+          cell(inj.reporter, {bold:true, fill:bg, width:1700}),
+        ]); }),
+      ]));
 
-<!-- COVER -->
-<div class="cover">
-  <div class="cover-title">תיק תרגיל</div>
-  <div class="cover-sub">${ex.name}</div>
-  <div class="cover-meta">
-    📍 ${ex.location} &nbsp;·&nbsp; 📅 ${ex.date} &nbsp;·&nbsp; ⏰ ${ex.startTime}–${this.endTime}<br/>
-    ${ex.exerciseType} &nbsp;·&nbsp; ${this.scenarioLabel(ex.mainScenario)} ${this.scenarioEmoji(ex.mainScenario)}<br/>
-    ${this.complexityLabel(ex.complexity)} &nbsp;·&nbsp; ${ex.populationSize.toLocaleString('he-IL')} תושבים
-  </div>
-  <div class="cover-meta" style="margin-top:12pt;color:#9ca3af;font-size:9pt">
-    הופק: ${new Date().toLocaleDateString('he-IL')} &nbsp;|&nbsp; מחולל תרגילים — מפקדת נפה
-  </div>
-</div>
+      // 4. Injection board — controller version
+      children.push(pageBreak());
+      children.push(sectionHeading('4. לוח הזרמות — גרסת בקר'));
+      children.push(bodyText('כולל פעולות צפויות ואמינות — לשימוש הבקר בלבד', { italics:true, size:18, color:COL.muted }));
+      children.push(table([
+        row([headerCell('#',400), headerCell('שעה',700), headerCell('גורם מדווח',1300), headerCell('סוג',900), headerCell('תוכן ההזרמה',3500), headerCell('פעולה צפויה',1900), headerCell('אמ׳',500)]),
+        ...ex.injections.map((inj,i)=>{ const bg = i%2 ? COL.light : COL.white; return row([
+          cell(String(inj.order), {align:AlignmentType.CENTER, fill:bg, width:400}),
+          cell(inj.time, {align:AlignmentType.CENTER, fill:bg, width:700}),
+          cell(inj.reporter, {bold:true, fill:bg, width:1300}),
+          cell(inj.type, {align:AlignmentType.CENTER, size:16, fill: TYPE_BG[inj.type]||COL.light, width:900}),
+          cell(inj.content, {fill:bg, width:3500}),
+          cell(inj.expectedAction, {color:COL.muted, size:16, fill:bg, width:1900}),
+          cell(inj.reliability, {align:AlignmentType.CENTER, bold:true, color: this.relColor(inj.reliability).slice(1).toUpperCase(), fill:bg, width:500}),
+        ]); }),
+      ]));
 
-<!-- DETAILS -->
-<h2>1. פרטי התרגיל</h2>
-<table class="meta-table">
-  <tr><td style="font-weight:600;width:130pt">שם התרגיל</td><td>${ex.name}</td><td style="font-weight:600;width:100pt">תאריך</td><td>${ex.date}</td></tr>
-  <tr><td style="font-weight:600">מיקום / רשות</td><td>${ex.location}</td><td style="font-weight:600">סוג תרגיל</td><td>${ex.exerciseType}</td></tr>
-  <tr><td style="font-weight:600">תרחיש ראשי</td><td>${this.scenarioLabel(ex.mainScenario)} ${this.scenarioEmoji(ex.mainScenario)}</td><td style="font-weight:600">תרחישים משניים</td><td>${secNames||'—'}</td></tr>
-  <tr><td style="font-weight:600">שעות תרגיל</td><td>${ex.startTime}–${this.endTime} (${ex.durationHours} שעות)</td><td style="font-weight:600">מורכבות</td><td>${this.complexityLabel(ex.complexity)}</td></tr>
-  <tr><td style="font-weight:600">גודל אוכלוסייה</td><td>${ex.populationSize.toLocaleString('he-IL')} תושבים</td><td style="font-weight:600">מכלולים</td><td>${unitNames}</td></tr>
-</table>
+      // 5. Anchor list
+      children.push(pageBreak());
+      children.push(sectionHeading(`5. רשימת עוגן (${ex.anchorList.length} תושבים)`));
+      children.push(table([
+        row([headerCell('#',400),headerCell('שם משפחה',1100),headerCell('שם פרטי',1100),headerCell('מגדר',500),headerCell('ת.ז.',1200),headerCell('קטין',500),headerCell('רחוב',1300),headerCell('מס׳',500),headerCell('כניסה',500),headerCell('דירה',500),headerCell('טלפון',1200),headerCell('סטטוס',1100)]),
+        ...ex.anchorList.map((a,i)=>{ const bg = i%2 ? COL.light : COL.white; return row([
+          cell(String(i+1), {align:AlignmentType.CENTER, color:COL.muted, fill:bg, width:400}),
+          cell(a.lastName||'', {bold:true, fill:bg, width:1100}),
+          cell(a.firstName||a.name||'', {fill:bg, width:1100}),
+          cell(a.gender||'', {align:AlignmentType.CENTER, fill:bg, width:500}),
+          cell(a.idNum||'', {size:16, fill:bg, width:1200}),
+          cell(a.isMinor||'', {align:AlignmentType.CENTER, fill:bg, width:500}),
+          cell(a.street||'', {fill:bg, width:1300}),
+          cell(String(a.houseNum||''), {fill:bg, width:500}),
+          cell(a.entrance||'', {fill:bg, width:500}),
+          cell(String(a.apt||''), {fill:bg, width:500}),
+          cell(a.phone||'', {size:16, fill:bg, width:1200}),
+          cell(a.status||'', {bold:true, fill:bg, width:1100}),
+        ]); }),
+      ]));
 
-<!-- POPULATION STORY -->
-<h2>2. סיפור האוכלוסייה</h2>
-<pre>${ex.populationStory}</pre>
+      // 6. Expectations
+      children.push(pageBreak());
+      children.push(sectionHeading('6. ציפיות ודגשים'));
+      children.push(subHeading('ציפיות מהרשות (כולל)'));
+      children.push(...(ex.authorityExpect||'').split('\n').filter(Boolean).map(l=>bodyText(l)));
+      if (ex.unitExpectations && ex.unitExpectations.length) {
+        children.push(subHeading('ציפיות לפי מכלול'));
+        children.push(table([
+          row([headerCell('מכלול',1800), headerCell('ציפיות',6700)]),
+          ...ex.unitExpectations.map((ue,i)=>{ const bg = i%2 ? COL.light : COL.white; return row([
+            cell(ue.unitName, {bold:true, fill:bg, width:1800}),
+            cell(ue.expectation, {fill:bg, width:6700}),
+          ]); }),
+        ]));
+      }
+      if (ex.mentorHighlights) {
+        children.push(subHeading('דגשי חונך'));
+        children.push(...ex.mentorHighlights.split('\n').filter(Boolean).map(l=>bodyText(l)));
+      }
+      if (ex.controllerHighlights) {
+        children.push(subHeading('דגשי בקר'));
+        children.push(...ex.controllerHighlights.split('\n').filter(Boolean).map(l=>bodyText(l)));
+      }
 
-<!-- INJECTION BOARD — DRILL VERSION -->
-<div class="page-break"></div>
-<h2>3. לוח הזרמות — גרסת תרגיל (${ex.injections.length} הזרמות)</h2>
-<p class="section-label">לשימוש בזמן התרגיל בלבד</p>
-<table>
-  <thead><tr>
-    <th style="width:55pt;text-align:center">שעה</th>
-    <th>דיווח</th>
-    <th style="width:85pt">גורם מדווח</th>
-  </tr></thead>
-  <tbody>${injRowsDrill}</tbody>
-</table>
+      const doc = new Document({ sections: [{ properties: {}, children }] });
 
-<!-- INJECTION BOARD — CONTROLLER VERSION -->
-<div class="page-break"></div>
-<h2>4. לוח הזרמות — גרסת בקר</h2>
-<p class="section-label">כולל פעולות צפויות ואמינות — לשימוש הבקר בלבד</p>
-<table>
-  <thead><tr>
-    <th style="width:15pt">#</th><th style="width:45pt">שעה</th><th style="width:75pt">גורם מדווח</th>
-    <th style="width:55pt">סוג</th><th>תוכן ההזרמה</th><th style="width:130pt">פעולה צפויה</th><th style="width:25pt">אמ'</th>
-  </tr></thead>
-  <tbody>${injRowsCtrl}</tbody>
-</table>
-
-<!-- ANCHOR LIST -->
-<div class="page-break"></div>
-<h2>5. רשימת עוגן (${ex.anchorList.length} תושבים)</h2>
-<table>
-  <thead><tr>
-    <th style="width:18pt">#</th><th style="width:65pt">שם משפחה</th><th style="width:55pt">שם פרטי</th>
-    <th style="width:25pt">מגדר</th><th style="width:75pt">ת.ז.</th><th style="width:35pt">קטין</th>
-    <th>רחוב</th><th style="width:28pt">מס'</th><th style="width:28pt">כניסה</th>
-    <th style="width:28pt">דירה</th><th style="width:75pt">טלפון</th><th style="width:65pt">סטטוס</th>
-  </tr></thead>
-  <tbody>${anchorRows}</tbody>
-</table>
-
-<!-- EXPECTATIONS -->
-<div class="page-break"></div>
-<h2>6. ציפיות ודגשים</h2>
-<h3>ציפיות מהרשות (כולל)</h3>
-<p style="line-height:1.8">${ex.authorityExpect}</p>
-${unitExpRows ? `<h3>ציפיות לפי מכלול</h3><table><thead><tr><th style="width:120pt">מכלול</th><th>ציפיות</th></tr></thead><tbody>${unitExpRows}</tbody></table>` : ''}
-${ex.mentorHighlights ? `<h3>דגשי חונך</h3><pre>${ex.mentorHighlights}</pre>` : ''}
-${ex.controllerHighlights ? `<h3>דגשי בקר</h3><pre>${ex.controllerHighlights}</pre>` : ''}
-
-</body></html>`;
-
-      const blob = new Blob(['﻿', html], {type:'application/msword'});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `תיק_תרגיל_${ex.name||'תרגיל'}.doc`;
-      a.click();
-      this.toast('תיק תרגיל יוצא ל-Word ✓','success');
+      try {
+        const blob = await Packer.toBlob(doc);
+        const safeName = (ex.name||'תרגיל').replace(/[\\/:*?"<>|]/g,'_');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `תיק_תרגיל_${safeName}.docx`;
+        a.click();
+        this.toast('תיק תרגיל יוצא ל-Word','success');
+      } catch(e) {
+        this.toast(`שגיאה בייצוא ל-Word: ${e.message}`,'error');
+      }
     },
 
     async exportPPTX() {
@@ -1940,10 +1945,9 @@ ${ex.controllerHighlights ? `<h3>דגשי בקר</h3><pre>${ex.controllerHighlig
         await doExportPPTX(this.current, {
           endTime: this.endTime,
           getScenarioLabel: id => this.scenarioLabel(id),
-          getScenarioEmoji: id => this.scenarioEmoji(id),
           getComplexityLabel: c => this.complexityLabel(c),
         });
-        this.toast('מצגת PowerPoint יוצאה בהצלחה ✓','success');
+        this.toast('מצגת PowerPoint יוצאה בהצלחה','success');
       } catch(e) {
         this.pptxError = `שגיאה ביצירת המצגת: ${e.message}`;
         this.toast('שגיאה ביצוא PowerPoint','error');
