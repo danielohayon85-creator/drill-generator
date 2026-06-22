@@ -793,14 +793,17 @@ const TEMPLATE = /* html */`
   <div v-if="view==='home'" class="home-wrap">
     <div class="home-panel">
       <div class="home-hero">
-          <h1 class="home-title">מחולל תרגילים</h1>
+        <div class="home-logo"><i class="ti ti-shield-check" aria-hidden="true"></i></div>
+        <h1 class="home-title">מחולל תרגילים</h1>
         <p class="home-sub">כלי מקצועי לבניית תיקי תרגיל מלאים למפקדות נפה, רשויות מקומיות, חונכים ובקרים</p>
       </div>
       <div class="home-actions">
         <button class="home-btn home-btn-primary" @click="startNew">
+          <i class="ti ti-plus" aria-hidden="true"></i>
           צור תרגיל חדש
         </button>
         <button class="home-btn home-btn-secondary" @click="view='exercises'">
+          <i class="ti ti-folder" aria-hidden="true"></i>
           תרגילים שמורים ({{ exercises.length }})
         </button>
       </div>
@@ -816,12 +819,12 @@ const TEMPLATE = /* html */`
         </span>
       </div>
       <div class="home-features">
-        <div class="feature-card"><div class="feature-title">אשף שלבים</div><div class="feature-desc">8 תרחישים, עד 3 אתגרים משניים</div></div>
-        <div class="feature-card"><div class="feature-title">הזרמות אוטומטיות</div><div class="feature-desc">לוח הזרמות מלא עם זמנים ומדווחים</div></div>
-        <div class="feature-card"><div class="feature-title">סיפור אוכלוסייה</div><div class="feature-desc">סיפור + רשימת עוגן סינתטית</div></div>
-        <div class="feature-card"><div class="feature-title">ציפיות ודגשים</div><div class="feature-desc">לכל מכלול, חונך ובקר</div></div>
-        <div class="feature-card"><div class="feature-title">ייצוא CSV</div><div class="feature-desc">לוח הזרמות לאקסל</div></div>
-        <div class="feature-card"><div class="feature-title">ייצוא Word</div><div class="feature-desc">תיק תרגיל מלא להפצה</div></div>
+        <div class="feature-card"><i class="ti ti-list-check feature-icon" aria-hidden="true"></i><div class="feature-title">אשף שלבים</div><div class="feature-desc">8 תרחישים, עד 3 אתגרים משניים</div></div>
+        <div class="feature-card"><i class="ti ti-bolt feature-icon" aria-hidden="true"></i><div class="feature-title">הזרמות אוטומטיות</div><div class="feature-desc">לוח הזרמות מלא עם זמנים ומדווחים</div></div>
+        <div class="feature-card"><i class="ti ti-users feature-icon" aria-hidden="true"></i><div class="feature-title">סיפור אוכלוסייה</div><div class="feature-desc">סיפור + רשימת עוגן סינתטית</div></div>
+        <div class="feature-card"><i class="ti ti-medal feature-icon" aria-hidden="true"></i><div class="feature-title">ציפיות ודגשים</div><div class="feature-desc">לכל מכלול, חונך ובקר</div></div>
+        <div class="feature-card"><i class="ti ti-table feature-icon" aria-hidden="true"></i><div class="feature-title">ייצוא CSV</div><div class="feature-desc">לוח הזרמות לאקסל</div></div>
+        <div class="feature-card"><i class="ti ti-file-text feature-icon" aria-hidden="true"></i><div class="feature-title">ייצוא Word</div><div class="feature-desc">תיק תרגיל מלא להפצה</div></div>
       </div>
       <div class="home-legal">
         <p>כל הזכויות במערכת שמורות לדניאל אוחיון.</p>
@@ -839,6 +842,7 @@ const TEMPLATE = /* html */`
     </div>
     <div v-if="exercises.length===0" class="card">
       <div class="empty-state">
+        <i class="ti ti-folder-off empty-icon" aria-hidden="true"></i>
         <div class="empty-title">אין תרגילים שמורים עדיין</div>
         <div class="empty-sub mb-4">צור תרגיל חדש כדי להתחיל</div>
         <button class="btn btn-primary" @click="startNew">צור תרגיל ראשון</button>
@@ -1030,7 +1034,7 @@ const TEMPLATE = /* html */`
           </div>
         </div>
         <div class="info-box mt-3">
-          <span>⏱️</span>
+          <i class="ti ti-clock" aria-hidden="true"></i>
           <span>קצב הזרמה ממוצע: <strong>כל {{ Math.round(draft.durationHours*60/draft.injCount) }} דקות</strong> — {{ draft.injCount }} הזרמות בפרק של {{ draft.durationHours }} שעות.</span>
         </div>
       </div>
@@ -1046,7 +1050,7 @@ const TEMPLATE = /* html */`
     <!-- STEP 5: Edit injections -->
     <div v-if="step===5" class="wizard-card">
       <div class="card-header">
-        <span class="card-title">לוח הזרמות — {{ draft.injections.length }} הזרמות</span>
+        <span class="card-title"><i class="ti ti-bolt" aria-hidden="true"></i> לוח הזרמות — {{ draft.injections.length }} הזרמות</span>
         <button class="btn btn-secondary btn-sm" @click="runGenerate">ייצר מחדש</button>
       </div>
       <div class="inj-table-wrap" style="max-height:460px;overflow-y:auto">
@@ -1191,11 +1195,11 @@ const TEMPLATE = /* html */`
       <div class="detail-type">{{ current.exerciseType }}</div>
       <div class="detail-name">{{ current.name }}</div>
       <div class="detail-meta">
-        <div class="detail-meta-item">{{ current.location }}</div>
-        <div class="detail-meta-item">{{ current.date }}</div>
-        <div class="detail-meta-item">⏰ {{ current.startTime }} ({{ current.durationHours }} שעות)</div>
-        <div class="detail-meta-item">{{ scenarioLabel(current.mainScenario) }}</div>
-        <div class="detail-meta-item">{{ complexityLabel(current.complexity) }}</div>
+        <div class="detail-meta-item"><i class="ti ti-map-pin" aria-hidden="true"></i>{{ current.location }}</div>
+        <div class="detail-meta-item"><i class="ti ti-calendar" aria-hidden="true"></i>{{ current.date }}</div>
+        <div class="detail-meta-item"><i class="ti ti-clock" aria-hidden="true"></i>{{ current.startTime }} ({{ current.durationHours }} שעות)</div>
+        <div class="detail-meta-item"><i class="ti ti-alert-triangle" aria-hidden="true"></i>{{ scenarioLabel(current.mainScenario) }}</div>
+        <div class="detail-meta-item"><i class="ti ti-chart-bar" aria-hidden="true"></i>{{ complexityLabel(current.complexity) }}</div>
       </div>
       <div class="detail-stats">
         <div class="detail-stat"><div class="detail-stat-num">{{ current.injections.length }}</div><div class="detail-stat-lbl">הזרמות</div></div>
@@ -1206,18 +1210,18 @@ const TEMPLATE = /* html */`
     </div>
     <!-- Tabs -->
     <div class="detail-tabs">
-      <button class="dtab" :class="detailTab==='injections'?'active':''" @click="detailTab='injections'">לוח הזרמות</button>
-      <button class="dtab" :class="detailTab==='story'?'active':''" @click="detailTab='story'">סיפור אוכלוסייה</button>
-      <button class="dtab" :class="detailTab==='anchors'?'active':''" @click="detailTab='anchors'">🆔 רשימת עוגן</button>
-      <button class="dtab" :class="detailTab==='expect'?'active':''" @click="detailTab='expect'">ציפיות ודגשים</button>
-      <button class="dtab" :class="detailTab==='export'?'active':''" @click="detailTab='export'">ייצוא</button>
-      <button class="dtab" :class="detailTab==='pptx'?'active':''" @click="detailTab='pptx'">מצגת</button>
+      <button class="dtab" :class="detailTab==='injections'?'active':''" @click="detailTab='injections'"><i class="ti ti-bolt" aria-hidden="true"></i> לוח הזרמות</button>
+      <button class="dtab" :class="detailTab==='story'?'active':''" @click="detailTab='story'"><i class="ti ti-users" aria-hidden="true"></i> סיפור אוכלוסייה</button>
+      <button class="dtab" :class="detailTab==='anchors'?'active':''" @click="detailTab='anchors'"><i class="ti ti-id" aria-hidden="true"></i> רשימת עוגן</button>
+      <button class="dtab" :class="detailTab==='expect'?'active':''" @click="detailTab='expect'"><i class="ti ti-medal" aria-hidden="true"></i> ציפיות ודגשים</button>
+      <button class="dtab" :class="detailTab==='export'?'active':''" @click="detailTab='export'"><i class="ti ti-upload" aria-hidden="true"></i> ייצוא</button>
+      <button class="dtab" :class="detailTab==='pptx'?'active':''" @click="detailTab='pptx'"><i class="ti ti-presentation" aria-hidden="true"></i> מצגת</button>
     </div>
 
     <!-- Tab: Injections -->
     <div v-if="detailTab==='injections'" class="card">
       <div class="card-header">
-        <span class="card-title">לוח הזרמות — {{ current.injections.length }} הזרמות</span>
+        <span class="card-title"><i class="ti ti-bolt" aria-hidden="true"></i> לוח הזרמות — {{ current.injections.length }} הזרמות</span>
         <div class="btn-group">
           <span class="text-muted" style="align-self:center">{{ current.startTime }} — {{ endTime }}</span>
         </div>
@@ -1246,7 +1250,7 @@ const TEMPLATE = /* html */`
 
     <!-- Tab: Story -->
     <div v-if="detailTab==='story'" class="card">
-      <div class="card-header"><span class="card-title">סיפור האוכלוסייה</span></div>
+      <div class="card-header"><span class="card-title"><i class="ti ti-users" aria-hidden="true"></i> סיפור האוכלוסייה</span></div>
       <div class="card-body">
         <pre class="story-text">{{ current.populationStory }}</pre>
       </div>
@@ -1255,7 +1259,7 @@ const TEMPLATE = /* html */`
     <!-- Tab: Anchors -->
     <div v-if="detailTab==='anchors'" class="card">
       <div class="card-header">
-        <span class="card-title">🆔 רשימת עוגן — {{ current.anchorList.length }} תושבים</span>
+        <span class="card-title"><i class="ti ti-id" aria-hidden="true"></i> רשימת עוגן — {{ current.anchorList.length }} תושבים</span>
       </div>
       <div style="overflow-x:auto">
         <table class="anchor-table">
@@ -1312,9 +1316,10 @@ const TEMPLATE = /* html */`
     <div v-if="detailTab==='pptx'">
       <div class="card">
         <div class="card-header">
-          <span class="card-title">מצגת תדריך לתרגיל</span>
+          <span class="card-title"><i class="ti ti-presentation" aria-hidden="true"></i> מצגת תדריך לתרגיל</span>
           <button class="btn btn-primary" @click="exportPPTX" :disabled="pptxLoading">
-            <span v-if="pptxLoading">⏳ מייצר...</span>
+            <i v-if="pptxLoading" class="ti ti-loader-2" style="animation:spin 1.2s linear infinite" aria-hidden="true"></i>
+            <span v-if="pptxLoading">מייצר...</span>
             <span v-else>הורד PowerPoint</span>
           </button>
         </div>
@@ -1375,26 +1380,26 @@ const TEMPLATE = /* html */`
     <div v-if="detailTab==='export'">
       <div class="export-grid">
         <div class="export-card" @click="exportCSV">
-          
+          <i class="ti ti-table export-icon" aria-hidden="true"></i>
           <div class="export-title">ייצוא לוח הזרמות — CSV</div>
           <div class="export-desc">קובץ שניתן לפתוח ב-Excel. מכיל את כל ההזרמות עם שעות, מדווחים ותוכן.</div>
           <button class="btn btn-primary">הורד CSV</button>
         </div>
         <div class="export-card" @click="exportWord">
-          
+          <i class="ti ti-file-text export-icon" aria-hidden="true"></i>
           <div class="export-title">ייצוא תיק תרגיל מלא — Word</div>
           <div class="export-desc">מסמך Word מלא עם כל תוכן התיק: תרחיש, סיפור אוכלוסייה, הזרמות, ציפיות ודגשים.</div>
           <button class="btn btn-purple">הורד Word</button>
         </div>
         <div class="export-card" @click="exportPPTX">
-          
+          <i class="ti ti-presentation export-icon" aria-hidden="true"></i>
           <div class="export-title">מצגת תדריך — PowerPoint</div>
           <div class="export-desc">מצגת PowerPoint מעוצבת לתדריך התרגיל: שקפי כותרת, תרחיש, לוח הזרמות וציפיות.</div>
           <button class="btn btn-purple">הורד PPTX</button>
         </div>
       </div>
       <div class="card mt-4">
-        <div class="card-header"><span class="card-title">תיק תרגיל — תצוגה מקדימה</span></div>
+        <div class="card-header"><span class="card-title"><i class="ti ti-clipboard-text" aria-hidden="true"></i> תיק תרגיל — תצוגה מקדימה</span></div>
         <div class="card-body">
           <div class="story-section">
             <div class="story-section-title">פרטי התרגיל</div>
@@ -1412,7 +1417,8 @@ const TEMPLATE = /* html */`
   <!-- API loading overlay -->
   <div v-if="apiLoading" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center">
     <div style="background:white;border:1px solid var(--gray-200);border-radius:var(--radius-lg);padding:36px 48px;text-align:center;max-width:340px;box-shadow:var(--shadow-lg)">
-      <div style="font-weight:700;font-size:16px;margin-bottom:8px">Claude AI עובד...</div>
+      <i class="ti ti-loader-2" style="font-size:28px;color:var(--navy);display:block;margin-bottom:10px;animation:spin 1.2s linear infinite" aria-hidden="true"></i>
+      <div style="font-weight:700;font-size:16px;margin-bottom:8px">{{ currentProviderName }} עובד...</div>
       <div style="color:var(--gray-600);font-size:13px">{{ apiLoading }}</div>
       <div style="margin-top:18px;display:flex;gap:6px;justify-content:center">
         <div style="width:8px;height:8px;border-radius:50%;background:var(--primary);animation:bounce .8s infinite"></div>
@@ -1426,7 +1432,7 @@ const TEMPLATE = /* html */`
   <div v-if="showSettings" class="modal-backdrop" @click.self="showSettings=false">
     <div class="modal" style="max-width:480px">
       <div class="modal-header">
-        <span class="modal-title">הגדרות AI</span>
+        <span class="modal-title"><i class="ti ti-settings" aria-hidden="true"></i> הגדרות AI</span>
         <button class="modal-close" @click="showSettings=false">✕</button>
       </div>
       <div class="modal-body">
@@ -1463,7 +1469,7 @@ const TEMPLATE = /* html */`
   <!-- Delete confirm modal -->
   <div v-if="showDeleteModal" class="modal-backdrop" @click.self="showDeleteModal=false">
     <div class="modal modal-sm">
-      <div class="modal-header"><span class="modal-title">מחיקת תרגיל</span><button class="modal-close" @click="showDeleteModal=false">✕</button></div>
+      <div class="modal-header"><span class="modal-title"><i class="ti ti-trash" aria-hidden="true"></i> מחיקת תרגיל</span><button class="modal-close" @click="showDeleteModal=false">✕</button></div>
       <div class="modal-body"><p>האם למחוק את התרגיל הזה לצמיתות? לא ניתן לשחזר.</p></div>
       <div class="modal-footer">
         <button class="btn btn-secondary" @click="showDeleteModal=false">ביטול</button>
