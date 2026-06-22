@@ -634,6 +634,37 @@ function assignZoneCasualties(residents, counts) {
 
 function fullName(p) { return `${p.firstName} ${p.lastName}`; }
 
+// מציג רשימת אוכלוסייה לפי קומה/דירה (מגורים) או לפי תפקיד (מקום עבודה/מוסד) — תואם פורמט מסמכי תרגיל אמיתיים
+function renderRoster(residents) {
+  if (residents[0] && residents[0].floor) {
+    const byFloor = {};
+    residents.forEach(r => {
+      byFloor[r.floor] = byFloor[r.floor] || {};
+      (byFloor[r.floor][r.apt] = byFloor[r.floor][r.apt] || []).push(r);
+    });
+    let out = '';
+    Object.keys(byFloor).sort((a,b)=>a-b).forEach(f => {
+      out += `קומה ${f}:\n`;
+      const apts = byFloor[f];
+      Object.keys(apts).sort((a,b)=>a-b).forEach(a => {
+        const names = apts[a].map(p => `${p.firstName} ${p.lastName} – ${p.age}`).join(', ');
+        out += `  • דירה ${a}: ${names}\n`;
+      });
+    });
+    return out;
+  }
+  let out = 'אוכלוסייה לפי תפקיד:\n';
+  residents.forEach(p => { out += `  • ${p.firstName} ${p.lastName} – ${p.role}\n`; });
+  return out;
+}
+
+// מציג את דיווחי הזירה כטבלה (שעה | גורם מדווח | דיווח) — תואם את לוח ההזרמות האמיתי
+function renderBeatsTable(beats, baseMin) {
+  const header = ` שעה   | גורם מדווח       | דיווח\n${'─'.repeat(80)}`;
+  const rows = beats.map(([mins,txt,rep]) => ` ${minsToTime(mins,baseMin)} | ${String(rep).padEnd(16,' ')} | ${txt}`).join('\n');
+  return `${header}\n${rows}`;
+}
+
 function generatePopulationStory(draft) {
   const {mainScenario, location, populationSize, complexity, durationHours, secondaryScenarios, startTime} = draft;
   const m = ({1:.5,2:1,3:2})[complexity]||1;
@@ -722,14 +753,7 @@ function generatePopulationStory(draft) {
     const injuredPeople = [...groups.serious, ...groups.mod, ...groups.light].map(i=>residents[i]);
     const missingPeople = groups.missing.map(i=>residents[i]);
 
-    let floorLines = '';
-    if (residents[0] && residents[0].floor) {
-      const byFloor = {};
-      residents.forEach(r => { byFloor[r.floor] = (byFloor[r.floor]||0)+1; });
-      Object.keys(byFloor).sort((a,b)=>a-b).forEach(f => { floorLines += `  קומה ${f}: ${byFloor[f]} נפשות\n`; });
-    } else {
-      floorLines = `  (אוכלוסייה לפי תפקיד — אין חלוקה לקומות באתר זה)\n`;
-    }
+    const roster = renderRoster(residents);
 
     // ── דיווחים נושאי-שם בתוך הזירה (חפ"ק גדוד, איתורים, פינויים, פתרון נעדרים) ──
     let t = reportMin;
@@ -789,7 +813,7 @@ function generatePopulationStory(draft) {
     t += rnd(5,10);
     beats.push([t, `תמ"צ סופי לזירה: ${finalKilled} הרוגים, ${serious+mod+light} פצועים, ${trapped} לכודים חולצו, 0 נעדרים.`, 'גדוד']);
 
-    const beatLines = beats.map(([mins,txt,rep]) => `  ${minsToTime(mins,baseMin)}  ${rep.padEnd(14,' ')}  ${txt}`).join('\n');
+    const beatLines = renderBeatsTable(beats, baseMin);
 
     const endTime = minsToTime(Math.min(t, durationHours*60-2), baseMin);
     summaryRows.push({z, street, houseNum, reportTime, siteType, popAtSite, killed:finalKilled, injured:serious+mod+light, trapped, endTime});
@@ -801,28 +825,23 @@ function generatePopulationStory(draft) {
 
     zonesSections += `
 ═══════════════════════════════════════════
-זירה ${z}: רחוב ${street} ${houseNum}
+זירה ${z} – ${location}, רחוב ${street} ${houseNum}
 ═══════════════════════════════════════════
-מיקום:              רח' ${street} ${houseNum}, ${location}
-שעת דיווח ראשוני:  ${reportTime}
-סוג אתר:           ${siteType}
-אוכלוסייה באתר:    ${popAtSite} נפשות
+מיקום: רחוב ${street} ${houseNum}
+שעת דיווח על נפילה: ${reportTime}
+סוג אתר: ${siteType}
 
-רקע:
+סיפור רקע:
 ${bgByScenario(street, houseNum, siteType, popAtSite, floors)}
 
-אוכלוסייה בזירה לפי קומות:
-${floorLines}
-דיווחים נבחרים מהזירה (גדוד / כוחות שטח):
+רשימת אוכלוסייה
+${roster}
+סה"כ: ${popAtSite} אנשים באתר.
+
+דיווחים:
 ${beatLines}
 
-סיכום נפגעים סופי:
-  • הרוגים:           ${finalKilled}
-  • פצועים קשים:      ${serious}
-  • פצועים בינוניים:  ${mod}
-  • פצועים קלים:      ${light}
-  • לכודים (חולצו):   ${trapped}
-  • נעדרים:           0
+סיכום נפגעים בזירה: ${finalKilled} הרוגים, ${serious+mod+light} פצועים בדרגות שונות (${serious} קשה / ${mod} בינוני / ${light} קל), ${trapped} לכודים שחולצו, 0 נעדרים.
 `;
   }
 
