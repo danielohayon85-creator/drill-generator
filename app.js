@@ -160,6 +160,10 @@ function buildInjectionPrompt(draft) {
   const complexityHe = {1:'קלה',2:'בינונית',3:'גבוהה'}[draft.complexity];
   const [h,m] = (draft.startTime||'08:00').split(':').map(Number);
   const endT = `${padZ(Math.floor((h*60+m+draft.durationHours*60)/60)%24)}:${padZ((h*60+m+draft.durationHours*60)%60)}`;
+  const realStreets = getCityStreets(draft.location);
+  const streetsLine = realStreets && realStreets.length
+    ? `\n• רחובות אמיתיים ב${draft.location} לשימוש (חובה להשתמש רק באלה, לא להמציא רחובות): ${realStreets.slice(0,12).join(', ')}`
+    : '';
 
   return `אתה מומחה לבניית תרגילי חירום למפקדות נפה של פיקוד העורף בישראל.
 
@@ -168,7 +172,7 @@ function buildInjectionPrompt(draft) {
 • מיקום: ${draft.location}
 • תאריך: ${draft.date}  |  שעות: ${draft.startTime}–${endT}  (${draft.durationHours} שעות)
 • מספר הזרמות: ${draft.injCount}
-• מורכבות: ${complexityHe}${unitNames ? '\n• מכלולים: '+unitNames : ''}
+• מורכבות: ${complexityHe}${unitNames ? '\n• מכלולים: '+unitNames : ''}${streetsLine}
 
 כללים:
 1. פתח וסיים עם "מנהל תרגיל"
@@ -178,6 +182,7 @@ function buildInjectionPrompt(draft) {
 5. טרמינולוגיה פקע"ר: לכוד גלוי/סמוי, מאותר, חולץ, פונה, צפי, מרכז משפחות
 6. שעות בפורמט HH:MM בין ${draft.startTime} ל-${endT}
 7. עברית קצרה וענינית, כמו תרגיל אמיתי
+8. כשמזכירים כתובת/רחוב — להשתמש רק ברחובות האמיתיים שצוינו לעיל (אם צוינו)
 
 החזר JSON בלבד, ללא markdown, ללא הסבר:
 [{"time":"HH:MM","reporter":"...","type":"אירוע|דיווח|פקודה|עדכון|בקשה|מידע מודיעיני|הנחיה|אזהרה","content":"...","expectedAction":"...","reliability":"A|B|C|D"}]`;
@@ -189,7 +194,12 @@ function buildStoryPrompt(draft) {
     flood:'הצפה ושיטפון', chemical:'אירוע כימ"ב / חומ"ס', combat:'ירי רקטות / פגיעת טיל',
     traffic:'אסון תחבורה / ר"נ', infra:'קריסת תשתיות',
   };
-  const zoneCount = {1:1,2:2,3:3}[draft.complexity]||2;
+  const SINGLE_SITE = ['combat','chemical','traffic','mass_cas'];
+  const zoneCount = SINGLE_SITE.includes(draft.mainScenario) ? 1 : ({1:1,2:2,3:3}[draft.complexity]||2);
+  const realStreets = getCityStreets(draft.location);
+  const streetsLine = realStreets && realStreets.length
+    ? `\n• רחובות אמיתיים ב${draft.location} לשימוש (חובה להשתמש רק באלה, לא להמציא רחובות): ${realStreets.slice(0,12).join(', ')}`
+    : '';
   return `אתה מומחה לבניית תרגילי חירום בישראל.
 
 כתוב סיפור אוכלוסייה מלא לתרגיל:
@@ -197,9 +207,9 @@ function buildStoryPrompt(draft) {
 • מיקום: ${draft.location}
 • גודל אוכלוסייה: ${draft.populationSize.toLocaleString('he-IL')} תושבים
 • שעת פתיחה: ${draft.startTime}
-• מספר זירות: ${zoneCount}
+• מספר זירות: ${zoneCount}${zoneCount===1 ? ' (נקודת פגיעה יחידה — זירה אחת מורכבת ורוויית אירועים, לא לפצל למספר זירות)' : ''}${streetsLine}
 
-מבנה נדרש (כתוב בדיוק כך):
+מבנה נדרש (כתוב בדיוק כך). חובה להשתמש רק ברחובות האמיתיים שצוינו לעיל (אם צוינו) בכל מקום שמוזכר "[שם]" רחוב:
 
 ══════════════════════════════════════════════
 סיפור כללי
