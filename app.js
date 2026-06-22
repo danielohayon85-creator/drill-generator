@@ -31,6 +31,7 @@ const SEC_SCENARIOS = [
 
 const UNITS = [
   {id:'home_front',   name:'פיקוד העורף',        icon:''},
+  {id:'battalion',    name:'גדוד',               icon:''},
   {id:'fire_dept',    name:'כב"א',               icon:''},
   {id:'mda',          name:'מד"א',               icon:''},
   {id:'police',       name:'משטרת ישראל',         icon:''},
@@ -559,6 +560,80 @@ function genExpectedAction(type, scenario) {
   return map[type] || 'קליטה, הערכה, הנחיית כוחות.';
 }
 
+// בונה אוכלוסייה ספציפית (בעלי שם) לזירה — דירות/קומות לאתר מגורים, תפקידים לאתר עבודה/מוסד
+function genZoneResidents(siteType, popAtSite, floors) {
+  const residents = [];
+  const isWorkplace = siteType === 'מפעל / מחסן' || siteType === 'בניין משרדים';
+  const isInstitution = siteType === 'כולל / ישיבה' || siteType === 'מוסד ציבורי' || siteType === 'מוסד חינוכי';
+
+  if (isWorkplace || isInstitution) {
+    const roles = isWorkplace
+      ? ['מנהל המקום','עובד ייצור','עובד ייצור','עובד תחזוקה','מחסנאי','נהג משאית','עובדת משרד','עובד ייצור']
+      : ['תלמיד','אברך','מורה','עובד מוסד'];
+    let remaining = popAtSite;
+    while (remaining > 0) {
+      const isMale = Math.random() > .4;
+      residents.push({
+        firstName: isMale ? pick(NAMES_F) : pick(NAMES_W), lastName: pick(LAST_NAMES),
+        gender: isMale ? 'ז' : 'נ',
+        age: rnd(16,70), isMinor: false, floor: null, apt: null,
+        role: pick(roles), status: '',
+      });
+      remaining--;
+    }
+  } else {
+    let remaining = popAtSite;
+    let floor = 1;
+    let aptNum = 0;
+    while (remaining > 0 && floor <= Math.max(floors,1)) {
+      const aptsThisFloor = rnd(1,3);
+      for (let a=0; a<aptsThisFloor && remaining>0; a++) {
+        aptNum++;
+        const famSize = Math.min(remaining, rnd(1,5));
+        const lastName = pick(LAST_NAMES);
+        for (let p=0; p<famSize; p++) {
+          const isKid = Math.random() < .3;
+          const age = isKid ? rnd(1,17) : rnd(22,82);
+          const isMale = Math.random() > .48;
+          residents.push({
+            firstName: isMale ? pick(NAMES_F) : pick(NAMES_W), lastName, age,
+            gender: isMale ? 'ז' : 'נ',
+            isMinor: age < 18, floor, apt: aptNum, role: null, status: '',
+          });
+        }
+        remaining -= famSize;
+      }
+      floor++;
+    }
+  }
+  return residents;
+}
+
+// מקצה תפקידי נפגעים (הרוגים/לכודים/פצועים/נעדרים) לאנשים ספציפיים מתוך האוכלוסייה שנוצרה
+function assignZoneCasualties(residents, counts) {
+  const pool = residents.map((_,i)=>i);
+  for (let i=pool.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
+  const take = n => pool.splice(0, Math.min(n, pool.length));
+  const groups = {
+    killed:  take(counts.killed),
+    trapped: take(counts.trapped),
+    serious: take(counts.serious),
+    mod:     take(counts.mod),
+    light:   take(counts.light),
+    missing: take(counts.missing),
+  };
+  groups.killed.forEach(i  => residents[i].status = 'הרוג');
+  groups.trapped.forEach(i => residents[i].status = 'לכוד');
+  groups.serious.forEach(i => residents[i].status = 'פצוע קשה');
+  groups.mod.forEach(i     => residents[i].status = 'פצוע בינוני');
+  groups.light.forEach(i   => residents[i].status = 'פצוע קל');
+  groups.missing.forEach(i => residents[i].status = 'נעדר');
+  pool.forEach(i => residents[i].status = Math.random()<.5 ? 'פונה' : 'ידוע בטוח');
+  return groups;
+}
+
+function fullName(p) { return `${p.firstName} ${p.lastName}`; }
+
 function generatePopulationStory(draft) {
   const {mainScenario, location, populationSize, complexity, durationHours, secondaryScenarios, startTime} = draft;
   const m = ({1:.5,2:1,3:2})[complexity]||1;
@@ -597,6 +672,7 @@ function generatePopulationStory(draft) {
   let zonesSections = '';
   let totKilled=0, totSerious=0, totMod=0, totLight=0, totTrapped=0, totMissing=0;
   const summaryRows = [];
+  const zones = [];
 
   for (let z=1; z<=zoneCount; z++) {
     const street   = pickStreet(location);
@@ -605,13 +681,31 @@ function generatePopulationStory(draft) {
     const floors   = rnd(2,6);
     const popAtSite= rnd(8,35) * Math.max(1,Math.round(m));
     const reportTime = minsToTime(rnd(3,18), baseMin);
+    const reportMin = rnd(3,18);
 
-    const killed   = Math.random()<.35 ? rnd(1,3)*Math.ceil(m) : 0;
-    const serious  = rnd(1,4)*Math.ceil(m);
-    const mod      = rnd(2,6)*Math.ceil(m);
-    const light    = rnd(3,10)*Math.ceil(m);
-    const trapped  = rnd(2,8)*Math.ceil(m);
-    const missing  = rnd(1,5)*Math.ceil(m);
+    let killed   = Math.random()<.35 ? rnd(1,3)*Math.ceil(m) : 0;
+    let serious  = rnd(1,4)*Math.ceil(m);
+    let mod      = rnd(2,6)*Math.ceil(m);
+    let light    = rnd(3,10)*Math.ceil(m);
+    let trapped  = rnd(2,8)*Math.ceil(m);
+    let missing  = rnd(1,5)*Math.ceil(m);
+
+    // קיזוז יחסי כשהביקוש הכולל לנפגעים-בעלי-שם עולה על האוכלוסייה הממשית בזירה
+    // (כדי שכל קטגוריית נפגעים תקבל אנשים אמיתיים, כולל "נעדרים" שלא יוותרו ריקים)
+    {
+      const demand = killed+serious+mod+light+trapped+missing;
+      if (demand > popAtSite) {
+        const scale = (popAtSite*0.9) / demand;
+        const scaleDown = (n) => n>0 ? Math.max(1, Math.round(n*scale)) : 0;
+        killed = scaleDown(killed); serious = scaleDown(serious); mod = scaleDown(mod);
+        light = scaleDown(light); trapped = scaleDown(trapped); missing = scaleDown(missing);
+        let total = killed+serious+mod+light+trapped+missing;
+        while (total > popAtSite) {
+          if (light>1) { light--; } else if (mod>1) { mod--; } else if (serious>1) { serious--; } else if (trapped>1) { trapped--; } else if (missing>0) { missing--; } else break;
+          total--;
+        }
+      }
+    }
 
     totKilled  += killed;
     totSerious += serious;
@@ -620,17 +714,90 @@ function generatePopulationStory(draft) {
     totTrapped += trapped;
     totMissing += missing;
 
+    // אוכלוסייה בעלת שם לזירה — משם נשאבים גם הנפגעים המוזכרים בדיווחים וגם רשימת העוגן
+    const residents = genZoneResidents(siteType, popAtSite, floors);
+    const groups = assignZoneCasualties(residents, {killed, trapped, serious, mod, light, missing});
+    const killedPeople  = groups.killed.map(i=>residents[i]);
+    const trappedPeople = groups.trapped.map(i=>residents[i]);
+    const injuredPeople = [...groups.serious, ...groups.mod, ...groups.light].map(i=>residents[i]);
+    const missingPeople = groups.missing.map(i=>residents[i]);
+
     let floorLines = '';
-    let remaining = popAtSite;
-    for (let f=1; f<=Math.min(floors,4); f++) {
-      const fp = f<floors ? rnd(2,Math.max(3,Math.ceil(remaining/2))) : remaining;
-      remaining = Math.max(0, remaining-fp);
-      const note = Math.random()<.4 ? pick([' (כולל קשישים)',' (ילדים)',' (עובדים)',' (מוגבלי ניידות)']) : '';
-      floorLines += `  קומה ${f}: ${fp} נפשות${note}\n`;
+    if (residents[0] && residents[0].floor) {
+      const byFloor = {};
+      residents.forEach(r => { byFloor[r.floor] = (byFloor[r.floor]||0)+1; });
+      Object.keys(byFloor).sort((a,b)=>a-b).forEach(f => { floorLines += `  קומה ${f}: ${byFloor[f]} נפשות\n`; });
+    } else {
+      floorLines = `  (אוכלוסייה לפי תפקיד — אין חלוקה לקומות באתר זה)\n`;
     }
 
-    const endTime = minsToTime(rnd(45, durationHours*60-5), baseMin);
-    summaryRows.push({z, street, houseNum, reportTime, siteType, popAtSite, killed, injured:serious+mod+light, trapped, endTime});
+    // ── דיווחים נושאי-שם בתוך הזירה (חפ"ק גדוד, איתורים, פינויים, פתרון נעדרים) ──
+    let t = reportMin;
+    const beats = [];
+    beats.push([t, `${killed||trapped ? 'אותרו נפגעים ראשונים באתר' : 'מתקבל דיווח ראשוני מהשטח'}: ${rnd(2,6)*Math.ceil(m)} פצועים בדרגות שונות.`, 'כוחות בשטח']);
+
+    t += rnd(8,14);
+    beats.push([t, `חפ"ק גדוד מגיע לזירה ומתחיל לאסוף תמונת מצב מהכוחות בשטח.`, 'גדוד']);
+
+    if (injuredPeople.length) {
+      t += rnd(3,6);
+      const names = injuredPeople.slice(0,3).map(fullName).join(', ');
+      beats.push([t, `דיווח חפ"ק: אותרו פצועים — ${names}${injuredPeople.length>3?' ועוד':''}.`, 'גדוד']);
+    }
+    if (trappedPeople.length) {
+      t += rnd(3,6);
+      beats.push([t, `דיווח חפ"ק: חשש ל-${trappedPeople.length} לכודים בתוך ${siteType==='בית פרטי'?'הבית':'המבנה'}.`, 'גדוד']);
+    }
+    if (killedPeople.length) {
+      t += rnd(4,8);
+      const names = killedPeople.slice(0,2).map(fullName).join(', ');
+      beats.push([t, `אותרו הרוגים: ${names}${killedPeople.length>2?' ועוד':''}.`, 'לוחמי חילוץ']);
+    }
+    if (missingPeople.length) {
+      t += rnd(2,5);
+      const names = missingPeople.map(fullName).join(', ');
+      beats.push([t, `אזרחים מדווחים על נעדרים: ${names}.`, 'אזרחים']);
+    }
+
+    t += rnd(4,8);
+    beats.push([t, `תמ"צ גדוד: ${killed} הרוגים, ${serious+mod+light} פצועים, ${trapped} לכודים, ${missing} נעדרים.`, 'גדוד']);
+
+    if (trappedPeople.length) {
+      t += rnd(6,12);
+      beats.push([t, `דיווח חפ"ק: ${trappedPeople.length} הלכודים חולצו.`, 'גדוד']);
+    }
+
+    // פתרון נעדרים — ברוב המקרים מתברר שלא היו בזירה, ולעיתים שמדובר בהרוג נוסף
+    const resolvedMissing = [];
+    missingPeople.forEach(p => {
+      const foundDead = Math.random() < .15;
+      if (foundDead) {
+        p.status = 'הרוג';
+        killedPeople.push(p);
+      } else {
+        p.status = 'אותר בטוח';
+        resolvedMissing.push(p);
+      }
+    });
+    if (resolvedMissing.length) {
+      t += rnd(8,15);
+      const lines = resolvedMissing.map(p => `${fullName(p)} — ${pick(['לא היה/הייתה בזירה בזמן הפגיעה','אותר/ה מחוץ לזירה','אותר/ה אצל שכנים','נמצא/ה בבית ספר/עבודה'])}`).join('; ');
+      beats.push([t, `מתברר כי הנעדרים אותרו בטוחים: ${lines}.`, 'מש"ק אוכלוסייה']);
+    }
+
+    const finalKilled = killedPeople.length;
+    t += rnd(5,10);
+    beats.push([t, `תמ"צ סופי לזירה: ${finalKilled} הרוגים, ${serious+mod+light} פצועים, ${trapped} לכודים חולצו, 0 נעדרים.`, 'גדוד']);
+
+    const beatLines = beats.map(([mins,txt,rep]) => `  ${minsToTime(mins,baseMin)}  ${rep.padEnd(14,' ')}  ${txt}`).join('\n');
+
+    const endTime = minsToTime(Math.min(t, durationHours*60-2), baseMin);
+    summaryRows.push({z, street, houseNum, reportTime, siteType, popAtSite, killed:finalKilled, injured:serious+mod+light, trapped, endTime});
+
+    zones.push({
+      z, street, houseNum, location, siteType, popAtSite, reportTime,
+      residents, killedPeople, trappedPeople, injuredPeople, missingPeople: resolvedMissing,
+    });
 
     zonesSections += `
 ═══════════════════════════════════════════
@@ -646,13 +813,16 @@ ${bgByScenario(street, houseNum, siteType, popAtSite, floors)}
 
 אוכלוסייה בזירה לפי קומות:
 ${floorLines}
-סיכום נפגעים:
-  • הרוגים:           ${killed}
+דיווחים נבחרים מהזירה (גדוד / כוחות שטח):
+${beatLines}
+
+סיכום נפגעים סופי:
+  • הרוגים:           ${finalKilled}
   • פצועים קשים:      ${serious}
   • פצועים בינוניים:  ${mod}
   • פצועים קלים:      ${light}
-  • לכודים:           ${trapped}
-  • נעדרים:           ${missing}
+  • לכודים (חולצו):   ${trapped}
+  • נעדרים:           0
 `;
   }
 
@@ -661,7 +831,8 @@ ${floorLines}
     ` זירה ${r.z}      | רח' ${r.street} ${r.houseNum}`.padEnd(24) +
     `| ${r.reportTime}  | ${r.siteType.slice(0,16).padEnd(16)} | ${String(r.popAtSite).padEnd(4)} | ${String(r.killed).padEnd(6)} | ${String(r.injured).padEnd(6)} | ${r.trapped}`
   ).join('\n');
-  const summaryFooter = `${'─'.repeat(80)}\nסה"כ: ${totKilled} הרוגים | ${totSerious+totMod+totLight} פצועים (${totSerious} קשים / ${totMod} בינוניים / ${totLight} קלים) | ${totTrapped} לכודים | ${totMissing} נעדרים`;
+  const totKilledFinal = zones.reduce((s,z)=>s+z.killedPeople.length,0);
+  const summaryFooter = `${'─'.repeat(80)}\nסה"כ: ${totKilledFinal} הרוגים | ${totSerious+totMod+totLight} פצועים (${totSerious} קשים / ${totMod} בינוניים / ${totLight} קלים) | ${totTrapped} לכודים (חולצו) | 0 נעדרים`;
 
   const secText = secondaryScenarios.length
     ? '\n\nאתגרים משניים:\n' + secondaryScenarios.map(s=>{
@@ -670,7 +841,7 @@ ${floorLines}
       }).join('\n')
     : '';
 
-  return `══════════════════════════════════════════════
+  const text = `══════════════════════════════════════════════
 סיפור כללי
 ══════════════════════════════════════════════
 ${intro}
@@ -691,6 +862,8 @@ ${summaryBody}
 ${summaryFooter}
 
 משך התרגיל: ${durationHours} שעות | רמת מורכבות: ${{1:'קלה',2:'בינונית',3:'גבוהה'}[complexity]}`;
+
+  return { text, zones };
 }
 
 function generateAnchorList(draft, count=20) {
@@ -700,17 +873,14 @@ function generateAnchorList(draft, count=20) {
     'פצוע קל','פצוע בינוני','פצוע קשה',
     'לכוד','הרוג','חולץ',
   ];
-  const list = [];
-  for (let i=0;i<count;i++) {
+  const synth = () => {
     const isMale = Math.random() > .45;
     const isMinor = Math.random() < .18;
-    const firstName = isMale ? pick(NAMES_F) : pick(NAMES_W);
-    const lastName = pick(LAST_NAMES);
-    list.push({
+    return {
       id: uid(),
       idNum: '0' + rnd(10000000,99999999),
-      firstName,
-      lastName,
+      firstName: isMale ? pick(NAMES_F) : pick(NAMES_W),
+      lastName: pick(LAST_NAMES),
       gender: isMale ? 'ז' : 'נ',
       isMinor: isMinor ? 'כן' : 'לא',
       street: pickStreet(draft.location),
@@ -720,9 +890,40 @@ function generateAnchorList(draft, count=20) {
       phone: '05'+rnd(0,9)+'-'+rnd(1000000,9999999),
       status: pick(statuses),
       notes: '',
+    };
+  };
+
+  // אם קיימת אוכלוסייה בעלת-שם מסיפור האוכלוסייה (draft.populationZones) — רשימת העוגן
+  // נשענת עליה, כדי שלא תהיה כפילות בין שני הנתונים (אותם אנשים, אותם כתובות/סטטוסים).
+  const zones = draft.populationZones;
+  if (zones && zones.length) {
+    const named = [];
+    zones.forEach(z => {
+      (z.residents || []).forEach(r => {
+        named.push({
+          id: uid(),
+          idNum: '0' + rnd(10000000,99999999),
+          firstName: r.firstName,
+          lastName: r.lastName,
+          gender: r.gender || (Math.random()>.5?'ז':'נ'),
+          isMinor: r.isMinor ? 'כן' : 'לא',
+          street: z.street,
+          houseNum: z.houseNum,
+          entrance: r.floor ? pick(['א','ב','ג','ד']) : '',
+          apt: r.apt || rnd(1,40),
+          phone: '05'+rnd(0,9)+'-'+rnd(1000000,9999999),
+          status: r.status || 'ידוע בטוח',
+          notes: r.role ? `תפקיד: ${r.role}` : '',
+        });
+      });
     });
+    // עירוב סדר כדי שלא יהיו מקובצים לפי זירה
+    for (let i=named.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [named[i],named[j]]=[named[j],named[i]]; }
+    if (named.length >= count) return named.slice(0, count);
+    return named.concat(Array.from({length: count-named.length}, synth));
   }
-  return list;
+
+  return Array.from({length: count}, synth);
 }
 
 function generateExpectations(draft) {
@@ -736,6 +937,7 @@ function generateExpectations(draft) {
   ];
   const unitSpecific = {
     home_front: 'ניהול כולל של האירוע, פיקוד על כוחות, הפעלת נוהלי פקע"ר.',
+    battalion:  'הקמת חפ"ק בזירה תוך 15-20 דקות מהפגיעה, ריכוז תמונת מצב מכוחות השטח (מ"מ/מ"פ/כב"ה/מד"א), עדכון תמ"צ לנפה במרווחים קבועים, בקשת חיזוקים לפי הצורך וניהול הסריקות הסופיות באתר.',
     fire_dept:  'חילוץ מהריסות, כיבוי, הצלה, קביעת תבנה.',
     mda:        'טיפול בנפגעים, פינוי, ניהול MCEI, עדכון מצב רפואי.',
     police:     'סדר ציבורי, חסימת אזורים, חקירה ראשונית, בקרת כניסה.',
@@ -777,6 +979,7 @@ function emptyDraft() {
     reliabilityProfile: 'mixed',
     populationSize: 50000,
     populationStory: '',
+    populationZones: [],
     anchorList: [],
     anchorCount: 20,
     injections: [],
@@ -1110,7 +1313,7 @@ const TEMPLATE = /* html */`
         <div class="story-section-title">סיפור האוכלוסייה</div>
         <div class="form-group">
           <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-            <button class="btn btn-secondary btn-sm" @click="draft.populationStory=generatePopulationStory(draft)">צור מחדש</button>
+            <button class="btn btn-secondary btn-sm" @click="regenerateStory">צור מחדש</button>
           </div>
           <textarea v-model="draft.populationStory" class="form-control" style="min-height:260px;font-size:13px;line-height:1.8"></textarea>
         </div>
@@ -1785,7 +1988,11 @@ Vue.createApp({
     },
 
     // Generate helpers (exposed to template)
-    generatePopulationStory(d) { return generatePopulationStory(d); },
+    regenerateStory() {
+      const { text, zones } = generatePopulationStory(this.draft);
+      this.draft.populationStory = text;
+      this.draft.populationZones = zones;
+    },
     generateAnchorList(d, n) { return generateAnchorList(d, n); },
 
     // Step 4→5 also generate story & anchors
@@ -1829,10 +2036,14 @@ Vue.createApp({
           try {
             this.draft.populationStory = await callAI(provider, apiKey, buildStoryPrompt(this.draft), 3000);
           } catch {
-            this.draft.populationStory = generatePopulationStory(this.draft);
+            const { text, zones } = generatePopulationStory(this.draft);
+            this.draft.populationStory = text;
+            this.draft.populationZones = zones;
           }
         } else {
-          this.draft.populationStory = generatePopulationStory(this.draft);
+          const { text, zones } = generatePopulationStory(this.draft);
+          this.draft.populationStory = text;
+          this.draft.populationZones = zones;
         }
       }
 
