@@ -71,7 +71,23 @@ function loadSettings() {
 }
 function saveSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
 
-async function callClaudeAPI(apiKey, prompt, maxTokens = 4000) {
+const AI_PROVIDERS = [
+  { id:'anthropic', name:'Claude (Anthropic)', placeholder:'sk-ant-api03-...' },
+  { id:'openai',     name:'OpenAI (GPT)',       placeholder:'sk-...' },
+  { id:'google',     name:'Gemini (Google)',    placeholder:'AIza...' },
+];
+
+async function callClaudeAPI(apiKey, prompt, maxTokens, provider) {
+  return callAI(provider || 'anthropic', apiKey, prompt, maxTokens);
+}
+
+async function callAI(provider, apiKey, prompt, maxTokens = 4000) {
+  if (provider === 'openai') return callOpenAI(apiKey, prompt, maxTokens);
+  if (provider === 'google') return callGemini(apiKey, prompt, maxTokens);
+  return callAnthropic(apiKey, prompt, maxTokens);
+}
+
+async function callAnthropic(apiKey, prompt, maxTokens) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -92,6 +108,44 @@ async function callClaudeAPI(apiKey, prompt, maxTokens = 4000) {
   }
   const data = await res.json();
   return data.content[0].text;
+}
+
+async function callOpenAI(apiKey, prompt, maxTokens) {
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'authorization': `Bearer ${apiKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `שגיאת API: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
+async function callGemini(apiKey, prompt, maxTokens) {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: maxTokens },
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `שגיאת API: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.candidates[0].content.parts[0].text;
 }
 
 function buildInjectionPrompt(draft) {
@@ -755,7 +809,7 @@ const TEMPLATE = /* html */`
           הגדרות API
         </button>
         <span v-if="settings.apiKey && settings.useApi" style="font-size:12px;color:#0f7b0f;font-weight:600">
-          ✓ Claude AI פעיל
+          ✓ {{ currentProviderName }} פעיל
         </span>
         <span v-else style="font-size:12px;color:#8a8886">
           (ללא AI — שימוש בתבניות)
@@ -1372,17 +1426,23 @@ const TEMPLATE = /* html */`
   <div v-if="showSettings" class="modal-backdrop" @click.self="showSettings=false">
     <div class="modal" style="max-width:480px">
       <div class="modal-header">
-        <span class="modal-title">הגדרות Claude API</span>
+        <span class="modal-title">הגדרות AI</span>
         <button class="modal-close" @click="showSettings=false">✕</button>
       </div>
       <div class="modal-body">
         <div class="info-box mb-4">
-          <span>עם API key תקני Claude יוצר הזרמות וסיפורי אוכלוסייה איכותיים יותר. ללא מפתח — המערכת עובדת עם תבניות.</span>
+          <span>עם API key תקני, מנוע ה-AI יוצר הזרמות וסיפורי אוכלוסייה איכותיים יותר. ללא מפתח — המערכת עובדת עם תבניות.</span>
         </div>
         <div class="form-group">
-          <label class="form-label">מפתח API של Anthropic (Claude)</label>
+          <label class="form-label">מנוע AI</label>
+          <select v-model="settings.provider" class="form-control">
+            <option v-for="p in AI_PROVIDERS" :key="p.id" :value="p.id">{{ p.name }}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">מפתח API</label>
           <input v-model="settings.apiKey" class="form-control" type="password"
-            placeholder="sk-ant-api03-..." style="direction:ltr;letter-spacing:.05em" />
+            :placeholder="currentProviderPlaceholder" style="direction:ltr;letter-spacing:.05em" />
           <div class="form-hint">המפתח נשמר מקומית בדפדפן בלבד, לא נשלח לשום שרת.</div>
         </div>
         <div class="form-group mt-3">
@@ -1390,7 +1450,7 @@ const TEMPLATE = /* html */`
             <input type="checkbox" v-model="settings.useApi" style="width:18px;height:18px" />
             <span style="font-weight:600">הפעל יצירת תוכן עם AI</span>
           </label>
-          <div class="form-hint">כשמופעל — לחיצה על "צור הזרמות" תפנה לשרת Claude. אם נכשל — חוזר לתבניות.</div>
+          <div class="form-hint">כשמופעל — לחיצה על "צור הזרמות" תפנה למנוע ה-AI שנבחר. אם נכשל — חוזר לתבניות.</div>
         </div>
       </div>
       <div class="modal-footer">
@@ -1635,12 +1695,12 @@ Vue.createApp({
       showDeleteModal: false,
       deleteTargetId: null,
       showSettings: false,
-      settings: loadSettings(),
+      settings: Object.assign({ provider:'anthropic' }, loadSettings()),
       apiLoading: '',
       pptxLoading: false,
       pptxError: '',
       // expose constants to template
-      SCENARIOS, SEC_SCENARIOS, UNITS, RELIABILITY, EXERCISE_TYPES,
+      SCENARIOS, SEC_SCENARIOS, UNITS, RELIABILITY, EXERCISE_TYPES, AI_PROVIDERS,
       wizardSteps: ['פרמטרים','תרחיש','מכלולים','הזרמות','עריכה','אוכלוסייה','ציפיות'],
     };
   },
@@ -1658,6 +1718,14 @@ Vue.createApp({
       const [h,m] = (this.current.startTime||'08:00').split(':').map(Number);
       const total = h*60 + m + this.current.durationHours*60;
       return `${padZ(Math.floor(total/60)%24)}:${padZ(total%60)}`;
+    },
+    currentProviderPlaceholder() {
+      const p = AI_PROVIDERS.find(x=>x.id===this.settings.provider);
+      return p ? p.placeholder : 'sk-...';
+    },
+    currentProviderName() {
+      const p = AI_PROVIDERS.find(x=>x.id===this.settings.provider);
+      return p ? p.name : 'AI';
     },
   },
   methods: {
@@ -1709,13 +1777,14 @@ Vue.createApp({
       await loadStreetsData();
       const settings = loadSettings();
       const apiKey = settings.apiKey;
+      const provider = settings.provider || 'anthropic';
       const useApi = !!(apiKey && settings.useApi);
 
       // — Injections —
       if (useApi) {
         this.apiLoading = 'מייצר הזרמות עם AI...';
         try {
-          const raw = await callClaudeAPI(apiKey, buildInjectionPrompt(this.draft));
+          const raw = await callAI(provider, apiKey, buildInjectionPrompt(this.draft));
           const jsonStr = raw.replace(/```json\n?|\n?```/g, '').trim();
           const parsed = JSON.parse(jsonStr);
           this.draft.injections = parsed.map((inj, i) => ({
@@ -1742,7 +1811,7 @@ Vue.createApp({
         if (useApi) {
           this.apiLoading = 'מייצר סיפור אוכלוסייה עם AI...';
           try {
-            this.draft.populationStory = await callClaudeAPI(apiKey, buildStoryPrompt(this.draft), 3000);
+            this.draft.populationStory = await callAI(provider, apiKey, buildStoryPrompt(this.draft), 3000);
           } catch {
             this.draft.populationStory = generatePopulationStory(this.draft);
           }
