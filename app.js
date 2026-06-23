@@ -821,6 +821,9 @@ function generatePopulationStory(draft) {
     zones.push({
       z, street, houseNum, location, siteType, popAtSite, reportTime,
       residents, killedPeople, trappedPeople, injuredPeople, missingPeople: resolvedMissing,
+      background: bgByScenario(street, houseNum, siteType, popAtSite, floors),
+      beats: beats.map(([mins,t,rep]) => ({ time: minsToTime(mins,baseMin), reporter: rep, content: t })),
+      finalKilled, serious, mod, light, trapped,
     });
 
     zonesSections += `
@@ -882,7 +885,7 @@ ${summaryFooter}
 
 משך התרגיל: ${durationHours} שעות | רמת מורכבות: ${{1:'קלה',2:'בינונית',3:'גבוהה'}[complexity]}`;
 
-  return { text, zones };
+  return { text, zones, intro };
 }
 
 function generateAnchorList(draft, count=20) {
@@ -999,6 +1002,7 @@ function emptyDraft() {
     populationSize: 50000,
     populationStory: '',
     populationZones: [],
+    populationIntro: '',
     anchorList: [],
     anchorCount: 20,
     injections: [],
@@ -2008,9 +2012,10 @@ Vue.createApp({
 
     // Generate helpers (exposed to template)
     regenerateStory() {
-      const { text, zones } = generatePopulationStory(this.draft);
+      const { text, zones, intro } = generatePopulationStory(this.draft);
       this.draft.populationStory = text;
       this.draft.populationZones = zones;
+      this.draft.populationIntro = intro;
     },
     generateAnchorList(d, n) { return generateAnchorList(d, n); },
 
@@ -2055,14 +2060,16 @@ Vue.createApp({
           try {
             this.draft.populationStory = await callAI(provider, apiKey, buildStoryPrompt(this.draft), 3000);
           } catch {
-            const { text, zones } = generatePopulationStory(this.draft);
+            const { text, zones, intro } = generatePopulationStory(this.draft);
             this.draft.populationStory = text;
             this.draft.populationZones = zones;
+            this.draft.populationIntro = intro;
           }
         } else {
-          const { text, zones } = generatePopulationStory(this.draft);
+          const { text, zones, intro } = generatePopulationStory(this.draft);
           this.draft.populationStory = text;
           this.draft.populationZones = zones;
+          this.draft.populationIntro = intro;
         }
       }
 
@@ -2169,6 +2176,7 @@ Vue.createApp({
 
       // Cover
       children.push(
+        new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:0}, children:[txt('לשימוש תרגיל בלבד — מסמך סינתטי, אינו מבצעי',{bold:true,size:16,color:COL.muted})] }),
         new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{before:600,after:200}, children:[txt('תיק תרגיל',{bold:true,size:56,color:COL.primary})] }),
         new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:300}, border:{bottom:{style:BorderStyle.SINGLE,size:12,color:COL.primary}}, children:[txt(ex.name,{size:32,color:COL.dark})] }),
         new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:80}, children:[txt(`${ex.location}  ·  ${ex.date}  ·  ${ex.startTime}–${this.endTime}`,{size:22,color:COL.muted})] }),
@@ -2190,7 +2198,58 @@ Vue.createApp({
       // 2. Population story
       children.push(pageBreak());
       children.push(sectionHeading('2. סיפור האוכלוסייה'));
-      children.push(...preBlock(ex.populationStory));
+
+      const metaLine = (label, value) => new Paragraph({
+        bidirectional:true, alignment:AlignmentType.RIGHT, spacing:{after:40},
+        children:[txt(`${label}: `,{bold:true,size:20,color:COL.dark}), txt(value,{size:20,color:COL.dark})],
+      });
+
+      if (ex.populationZones && ex.populationZones.length) {
+        children.push(...preBlock(ex.populationIntro || ''));
+        ex.populationZones.forEach(z => {
+          children.push(subHeading(`זירה ${z.z} – ${ex.location}, רחוב ${z.street} ${z.houseNum}`));
+          children.push(metaLine('מיקום', `רחוב ${z.street} ${z.houseNum}`));
+          children.push(metaLine('שעת דיווח על נפילה', z.reportTime));
+          children.push(metaLine('סוג אתר', z.siteType));
+
+          children.push(para('סיפור רקע:', {bold:true,size:20,color:COL.dark,spacing:{before:120,after:40}}));
+          children.push(bodyText(z.background));
+
+          children.push(para('רשימת אוכלוסייה', {bold:true,size:20,color:COL.dark,spacing:{before:120,after:60}}));
+          if (z.residents[0] && z.residents[0].floor) {
+            const byFloor = {};
+            z.residents.forEach(r => { (byFloor[r.floor]=byFloor[r.floor]||{})[r.apt] = (byFloor[r.floor][r.apt]||[]).concat([r]); });
+            Object.keys(byFloor).sort((a,b)=>a-b).forEach(f => {
+              children.push(para(`קומה ${f}:`, {bold:true,size:19,color:COL.primary,spacing:{after:30}}));
+              Object.keys(byFloor[f]).sort((a,b)=>a-b).forEach(a => {
+                const names = byFloor[f][a].map(p=>`${p.firstName} ${p.lastName} – ${p.age}`).join(', ');
+                children.push(para(`•  דירה ${a}: ${names}`, {size:18,color:COL.dark,spacing:{after:20}}));
+              });
+            });
+          } else {
+            children.push(para('אוכלוסייה לפי תפקיד:', {bold:true,size:19,color:COL.primary,spacing:{after:30}}));
+            z.residents.forEach(p => children.push(para(`•  ${p.firstName} ${p.lastName} – ${p.role}`, {size:18,color:COL.dark,spacing:{after:15}})));
+          }
+          children.push(para(`סה"כ: ${z.popAtSite} אנשים באתר.`, {bold:true,size:19,color:COL.dark,spacing:{before:60,after:120}}));
+
+          children.push(para('דיווחים:', {bold:true,size:20,color:COL.dark,spacing:{after:60}}));
+          children.push(table([
+            row([headerCell('שעה',700), headerCell('גורם מדווח',1700), headerCell('דיווח',5600)]),
+            ...z.beats.map((b,i) => { const bg = i%2 ? COL.light : COL.white; return row([
+              cell(b.time, {align:AlignmentType.CENTER, bold:true, color:COL.primary, fill:bg, width:700}),
+              cell(b.reporter, {bold:true, fill:bg, width:1700}),
+              cell(b.content, {fill:bg, width:5600}),
+            ]); }),
+          ]));
+
+          children.push(para(
+            `סיכום נפגעים בזירה: ${z.finalKilled} הרוגים, ${z.serious+z.mod+z.light} פצועים בדרגות שונות (${z.serious} קשה / ${z.mod} בינוני / ${z.light} קל), ${z.trapped} לכודים שחולצו, 0 נעדרים.`,
+            {bold:true,size:19,color:COL.dark,spacing:{before:120,after:80}}
+          ));
+        });
+      } else {
+        children.push(...preBlock(ex.populationStory));
+      }
 
       // 3. Injection board — drill version
       children.push(pageBreak());
