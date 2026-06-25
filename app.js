@@ -63,6 +63,70 @@ const STREETS = ['הרצל','ויצמן','בן-גוריון','ז\'בוטינסק
 const HOSPITALS = ['רמב"ם','איכילוב','בני ציון','הלל יפה','העמק','סורוקה','ברזילי','שיבא','הדסה'];
 
 /* ═══════════════════════════════════════════════════
+   AUTH (Firebase) — התחברות, ניהול משתמשים, יומן פעילות
+═══════════════════════════════════════════════════ */
+let fbApp = null, fbAuth = null, fbDb = null;
+
+function initFirebase() {
+  if (fbApp) return;
+  if (typeof firebase === 'undefined') return;
+  if (typeof FIREBASE_CONFIG === 'undefined' || !FIREBASE_CONFIG || FIREBASE_CONFIG.apiKey === 'REPLACE_ME') return;
+  try {
+    fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+    fbAuth = firebase.auth();
+    fbDb = firebase.firestore();
+  } catch (e) {
+    console.warn('Firebase init failed', e);
+  }
+}
+
+async function ensureUserDoc(user) {
+  if (!fbDb) return;
+  const ref = fbDb.collection('users').doc(user.uid);
+  try {
+    const snap = await ref.get();
+    if (!snap.exists) {
+      await ref.set({
+        email: user.email,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+        loginCount: 1,
+      });
+    } else {
+      await ref.update({
+        lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+        loginCount: firebase.firestore.FieldValue.increment(1),
+      });
+    }
+  } catch (e) { console.warn('ensureUserDoc failed', e); }
+}
+
+async function logActivity(action, details = {}) {
+  if (!fbDb || !fbAuth || !fbAuth.currentUser) return;
+  try {
+    await fbDb.collection('activity_logs').add({
+      uid: fbAuth.currentUser.uid,
+      email: fbAuth.currentUser.email,
+      action, details,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (e) { console.warn('logActivity failed', e); }
+}
+
+function translateAuthError(e) {
+  const map = {
+    'auth/invalid-email': 'כתובת מייל לא תקינה',
+    'auth/user-not-found': 'משתמש לא נמצא',
+    'auth/wrong-password': 'סיסמה שגויה',
+    'auth/email-already-in-use': 'כתובת המייל כבר רשומה במערכת',
+    'auth/weak-password': 'הסיסמה חייבת להיות לפחות 6 תווים',
+    'auth/invalid-credential': 'פרטי התחברות שגויים',
+    'auth/too-many-requests': 'יותר מדי ניסיונות — נסה שוב בעוד מספר דקות',
+  };
+  return map[e.code] || `שגיאה: ${e.message}`;
+}
+
+/* ═══════════════════════════════════════════════════
    SETTINGS & API
 ═══════════════════════════════════════════════════ */
 const SETTINGS_KEY = 'drill_gen_settings_v1';
@@ -1025,8 +1089,56 @@ const TEMPLATE = /* html */`
     <div v-for="t in toasts" :key="t.id" class="toast" :class="'toast-'+t.type">{{ t.msg }}</div>
   </div>
 
+  <!-- ── AUTH LOADING ── -->
+  <div v-if="isAuthConfigured && !authReady" class="auth-wrap">
+    <iconify-icon icon="fluent:arrow-sync-circle-24-regular" style="font-size:32px;color:var(--navy);animation:spin 1.2s linear infinite" aria-hidden="true"></iconify-icon>
+  </div>
+
+  <!-- ── AUTH GATE (login / signup) ── -->
+  <div v-else-if="isAuthConfigured && !authUser" class="auth-wrap">
+    <div class="auth-panel">
+      <div class="home-logo" style="margin:0 auto 18px"><iconify-icon icon="fluent:shield-checkmark-24-regular" aria-hidden="true"></iconify-icon></div>
+      <h1 class="home-title" style="text-align:center">מחולל תרגילים</h1>
+      <p class="home-sub" style="text-align:center;margin-bottom:24px">{{ authMode==='login' ? 'התחברות למערכת' : 'יצירת חשבון חדש' }}</p>
+
+      <div class="form-group">
+        <label class="form-label">דוא"ל</label>
+        <input v-model="authEmail" type="email" class="form-control" placeholder="name@example.com" style="direction:ltr" @keyup.enter="authMode==='login'?authLogin():authSignup()" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">סיסמה</label>
+        <input v-model="authPassword" type="password" class="form-control" placeholder="לפחות 6 תווים" style="direction:ltr" @keyup.enter="authMode==='login'?authLogin():authSignup()" />
+      </div>
+      <div v-if="authError" class="warn-box mb-3">{{ authError }}</div>
+
+      <button v-if="authMode==='login'" class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" :disabled="authBusy" @click="authLogin">
+        {{ authBusy ? 'מתחבר...' : 'התחברות' }}
+      </button>
+      <button v-else class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" :disabled="authBusy" @click="authSignup">
+        {{ authBusy ? 'יוצר חשבון...' : 'יצירת חשבון' }}
+      </button>
+
+      <div style="text-align:center;margin-top:16px;font-size:13px">
+        <span v-if="authMode==='login'">אין לך חשבון? <a href="#" @click.prevent="authMode='signup';authError=''" style="color:var(--primary)">צור חשבון</a></span>
+        <span v-else>יש לך חשבון? <a href="#" @click.prevent="authMode='login';authError=''" style="color:var(--primary)">התחבר</a></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MAIN APP (after auth) ── -->
+  <div v-else>
+
   <!-- ── HOME ── -->
   <div v-if="view==='home'" class="home-wrap">
+    <div v-if="authUser" class="user-bar">
+      <span class="user-bar-email">{{ authUser.email }}</span>
+      <button v-if="isAdmin" class="btn btn-ghost btn-sm" @click="openAdmin">
+        <iconify-icon icon="fluent:people-24-regular" aria-hidden="true"></iconify-icon> לוח אדמין
+      </button>
+      <button class="btn btn-ghost btn-sm" @click="authLogout">
+        <iconify-icon icon="fluent:arrow-upload-24-regular" style="transform:rotate(90deg)" aria-hidden="true"></iconify-icon> התנתקות
+      </button>
+    </div>
     <div class="home-panel">
       <div class="home-hero">
         <div class="home-logo"><iconify-icon icon="fluent:shield-checkmark-24-regular" aria-hidden="true"></iconify-icon></div>
@@ -1713,6 +1825,56 @@ const TEMPLATE = /* html */`
       </div>
     </div>
   </div>
+
+  <!-- ── ADMIN DASHBOARD ── -->
+  <div v-if="view==='admin'" class="page-wrap">
+    <div class="page-header">
+      <button class="back-btn" @click="view='home'">→ חזרה</button>
+      <span class="page-title">לוח אדמין</span>
+    </div>
+    <div v-if="adminLoading" class="empty-state">
+      <iconify-icon icon="fluent:arrow-sync-circle-24-regular" style="font-size:32px;color:var(--navy);animation:spin 1.2s linear infinite" aria-hidden="true"></iconify-icon>
+      <div class="empty-sub mt-2">טוען נתונים...</div>
+    </div>
+    <div v-else>
+      <div class="card mb-6">
+        <div class="card-header"><span class="card-title"><iconify-icon icon="fluent:people-24-regular" aria-hidden="true"></iconify-icon> משתמשים ({{ adminUsers.length }})</span></div>
+        <div style="overflow-x:auto">
+          <table class="anchor-table">
+            <thead><tr><th>דוא"ל</th><th>נוצר</th><th>התחברות אחרונה</th><th>מס' התחברויות</th></tr></thead>
+            <tbody>
+              <tr v-for="u in adminUsers" :key="u.id">
+                <td style="direction:ltr;text-align:right">{{ u.email }}</td>
+                <td>{{ fmtTimestamp(u.createdAt) }}</td>
+                <td>{{ fmtTimestamp(u.lastLogin) }}</td>
+                <td>{{ u.loginCount || 1 }}</td>
+              </tr>
+              <tr v-if="adminUsers.length===0"><td colspan="4" style="text-align:center;color:var(--gray-500)">אין משתמשים עדיין</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title"><iconify-icon icon="fluent:document-text-24-regular" aria-hidden="true"></iconify-icon> יומן פעילות ({{ adminLogs.length }} אחרונים)</span></div>
+        <div style="overflow-x:auto">
+          <table class="anchor-table">
+            <thead><tr><th>זמן</th><th>דוא"ל</th><th>פעולה</th><th>פרטים</th></tr></thead>
+            <tbody>
+              <tr v-for="l in adminLogs" :key="l.id">
+                <td style="white-space:nowrap">{{ fmtTimestamp(l.timestamp) }}</td>
+                <td style="direction:ltr;text-align:right">{{ l.email }}</td>
+                <td><span class="badge badge-blue">{{ actionLabel(l.action) }}</span></td>
+                <td style="font-size:11px;color:var(--gray-500)">{{ l.details && l.details.name ? l.details.name : '' }}</td>
+              </tr>
+              <tr v-if="adminLogs.length===0"><td colspan="4" style="text-align:center;color:var(--gray-500)">אין פעילות עדיין</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  </div>
 </div>
 `;
 
@@ -1941,6 +2103,17 @@ Vue.createApp({
       apiLoading: '',
       pptxLoading: false,
       pptxError: '',
+      // Auth
+      authUser: null,
+      authReady: false,
+      authMode: 'login', // 'login' | 'signup'
+      authEmail: '',
+      authPassword: '',
+      authError: '',
+      authBusy: false,
+      adminLogs: [],
+      adminUsers: [],
+      adminLoading: false,
       // expose constants to template
       SCENARIOS, SEC_SCENARIOS, UNITS, RELIABILITY, EXERCISE_TYPES, AI_PROVIDERS,
       wizardSteps: ['פרמטרים','תרחיש','מכלולים','הזרמות','עריכה','אוכלוסייה','ציפיות'],
@@ -1969,8 +2142,59 @@ Vue.createApp({
       const p = AI_PROVIDERS.find(x=>x.id===this.settings.provider);
       return p ? p.name : 'AI';
     },
+    isAuthConfigured() { return !!fbAuth; },
+    isAdmin() { return !!(this.authUser && typeof ADMIN_EMAILS !== 'undefined' && ADMIN_EMAILS.includes(this.authUser.email)); },
   },
   methods: {
+    async authLogin() {
+      if (!this.authEmail || !this.authPassword) { this.authError = 'נא למלא מייל וסיסמה'; return; }
+      this.authError = ''; this.authBusy = true;
+      try {
+        await fbAuth.signInWithEmailAndPassword(this.authEmail.trim(), this.authPassword);
+      } catch(e) { this.authError = translateAuthError(e); }
+      finally { this.authBusy = false; }
+    },
+    async authSignup() {
+      if (!this.authEmail || !this.authPassword) { this.authError = 'נא למלא מייל וסיסמה'; return; }
+      this.authError = ''; this.authBusy = true;
+      try {
+        await fbAuth.createUserWithEmailAndPassword(this.authEmail.trim(), this.authPassword);
+      } catch(e) { this.authError = translateAuthError(e); }
+      finally { this.authBusy = false; }
+    },
+    async authLogout() {
+      await logActivity('logout');
+      await fbAuth.signOut();
+      this.view = 'home';
+      this.authEmail = ''; this.authPassword = '';
+    },
+    async openAdmin() {
+      this.view = 'admin';
+      this.adminLoading = true;
+      try {
+        const logsSnap = await fbDb.collection('activity_logs').orderBy('timestamp','desc').limit(300).get();
+        this.adminLogs = logsSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+        const usersSnap = await fbDb.collection('users').orderBy('lastLogin','desc').get();
+        this.adminUsers = usersSnap.docs.map(d => ({ id:d.id, ...d.data() }));
+      } catch(e) {
+        this.toast('שגיאה בטעינת נתוני אדמין: '+e.message, 'error');
+      } finally {
+        this.adminLoading = false;
+      }
+    },
+    fmtTimestamp(ts) {
+      if (!ts) return '—';
+      const d = ts.toDate ? ts.toDate() : new Date(ts);
+      return d.toLocaleString('he-IL');
+    },
+    actionLabel(a) {
+      return {
+        login:'התחברות', logout:'התנתקות', created_exercise:'שמירת תרגיל',
+        deleted_exercise:'מחיקת תרגיל', duplicated_exercise:'שכפול תרגיל',
+        export_csv:'ייצוא CSV', export_word:'ייצוא Word', export_pptx:'ייצוא PowerPoint',
+      }[a] || a;
+    },
+
     startNew() { this.draft = emptyDraft(); this.step = 1; this.editingInjId = null; this.view = 'wizard'; },
     toggleSec(id) {
       const idx = this.draft.secondaryScenarios.indexOf(id);
@@ -1992,15 +2216,18 @@ Vue.createApp({
       this.current = ex;
       this.detailTab = 'injections';
       this.view = 'detail';
+      logActivity('created_exercise', { name: ex.name, location: ex.location });
     },
     openExercise(ex) { this.current = JSON.parse(JSON.stringify(ex)); this.detailTab = 'injections'; this.view = 'detail'; },
     confirmLeaveWizard() { if (confirm('לצאת מהאשף? ההתקדמות לא תישמר.')) this.view = 'home'; },
     confirmDelete(id) { this.deleteTargetId = id; this.showDeleteModal = true; },
     doDelete() {
+      const deleted = this.exercises.find(e=>e.id===this.deleteTargetId);
       this.exercises = this.exercises.filter(e=>e.id!==this.deleteTargetId);
       this.saveData(); this.showDeleteModal = false;
       if (this.current && this.current.id === this.deleteTargetId) { this.current = null; this.view = 'exercises'; }
       this.toast('תרגיל נמחק','info');
+      logActivity('deleted_exercise', { name: deleted ? deleted.name : '' });
     },
     duplicateExercise(id) {
       const ex = this.exercises.find(e=>e.id===id);
@@ -2008,6 +2235,7 @@ Vue.createApp({
       const copy = JSON.parse(JSON.stringify(ex));
       copy.id = uid(); copy.name = copy.name + ' (עותק)'; copy.createdAt = new Date().toISOString().slice(0,10);
       this.exercises.push(copy); this.saveData(); this.toast('תרגיל שוכפל','success');
+      logActivity('duplicated_exercise', { name: copy.name });
     },
 
     // Generate helpers (exposed to template)
@@ -2115,6 +2343,7 @@ Vue.createApp({
       XLSX.utils.book_append_sheet(wb, wsCtrl, 'לוח הזרמות — בקר');
       XLSX.writeFile(wb, `הזרמות_${ex.name||'תרגיל'}.xlsx`);
       this.toast('יוצא ל-Excel — 2 גרסאות','success');
+      logActivity('export_csv', { name: ex.name });
     },
 
     async exportWord() {
@@ -2336,6 +2565,7 @@ Vue.createApp({
         a.download = `תיק_תרגיל_${safeName}.docx`;
         a.click();
         this.toast('תיק תרגיל יוצא ל-Word','success');
+        logActivity('export_word', { name: ex.name });
       } catch(e) {
         this.toast(`שגיאה בייצוא ל-Word: ${e.message}`,'error');
       }
@@ -2356,6 +2586,7 @@ Vue.createApp({
           getComplexityLabel: c => this.complexityLabel(c),
         });
         this.toast('מצגת PowerPoint יוצאה בהצלחה','success');
+        logActivity('export_pptx', { name: this.current.name });
       } catch(e) {
         this.pptxError = `שגיאה ביצירת המצגת: ${e.message}`;
         this.toast('שגיאה ביצוא PowerPoint','error');
@@ -2398,5 +2629,21 @@ Vue.createApp({
       }[s]||'badge-gray';
     },
   },
-  mounted() { this.loadData(); loadStreetsData(); },
+  mounted() {
+    this.loadData();
+    loadStreetsData();
+    initFirebase();
+    if (fbAuth) {
+      fbAuth.onAuthStateChanged(async (user) => {
+        this.authUser = user;
+        this.authReady = true;
+        if (user) {
+          await ensureUserDoc(user);
+          await logActivity('login');
+        }
+      });
+    } else {
+      this.authReady = true;
+    }
+  },
 }).mount('#app');

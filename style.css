@@ -72,6 +72,25 @@ body {
 .toast-info    { background: var(--primary); }
 .toast-warning { background: var(--orange); }
 
+/* ─── Auth ─── */
+.auth-wrap {
+  min-height: 100vh; background: var(--gray-100);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.auth-panel {
+  background: white; border: 1px solid var(--gray-200); border-top: 4px solid var(--navy);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 40px 36px;
+  max-width: 380px; width: 100%;
+}
+.user-bar {
+  display: flex; align-items: center; gap: 10px; justify-content: center;
+  margin-bottom: 18px; flex-wrap: wrap;
+}
+.user-bar-email {
+  font-size: 12px; color: var(--gray-600); direction: ltr; background: var(--gray-50);
+  border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 6px 12px;
+}
+
 /* ─── Home ─── */
 .home-wrap {
   min-height: 100vh;
