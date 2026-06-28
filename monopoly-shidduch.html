@@ -123,6 +123,12 @@ h1,h2,h3{margin:0;}
 .hidden{display:none !important;}
 .help-text{font-size:12.5px; line-height:1.7; text-align:right; max-height:50vh; overflow-y:auto;}
 .help-text b{color:#c23566;}
+
+.ai-toggle{display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:700; color:var(--ink-soft); cursor:pointer; padding:6px 8px; border-radius:8px; background:#fbf6f9; border:1.5px solid #e8d8e6;}
+.ai-toggle input{cursor:pointer;}
+.ai-badge{font-size:11px; background:#eef0fc; color:#5b5fc7; padding:2px 7px; border-radius:10px; font-weight:700; margin-right:4px;}
+@keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.5;}}
+#roll-btn:disabled{animation:pulse 1.1s infinite;}
 </style>
 </head>
 <body>
@@ -290,6 +296,7 @@ let chanceDeck = [], communityDeck = [];
 let dice = [1,1];
 let extraRoll = false;
 let gameOver = false;
+let processing = false;
 
 function shuffle(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
 function freshDeck(cards){ return shuffle(cards.map((c,i)=>i)); }
@@ -303,8 +310,15 @@ function renderSetupRows(){
     const row = document.createElement('div');
     row.className = 'player-line';
     const tokenButtons = TOKENS.map((t,ti)=>`<div class="token-opt" data-pi="${i}" data-ti="${ti}">${t.icon}</div>`).join('');
-    row.innerHTML = `<input type="text" id="name-${i}" placeholder="שם שחקן ${i+1}" value="שחקן ${i+1}"><div class="token-pick">${tokenButtons}</div>`;
+    row.innerHTML = `<input type="text" id="name-${i}" placeholder="שם שחקן ${i+1}" value="שחקן ${i+1}">
+      <div class="token-pick">${tokenButtons}</div>
+      <label class="ai-toggle"><input type="checkbox" id="ai-${i}"> מחשב 🤖</label>`;
     wrap.appendChild(row);
+    document.getElementById('ai-'+i).onchange = (e)=>{
+      const nameInput = document.getElementById('name-'+i);
+      if(e.target.checked && (nameInput.value==='' || nameInput.value.startsWith('שחקן'))) nameInput.value = 'מחשב '+(i+1);
+      else if(!e.target.checked && nameInput.value.startsWith('מחשב')) nameInput.value = 'שחקן '+(i+1);
+    };
   }
   if(!window._tokenPicks) window._tokenPicks = {};
   for(let i=0;i<playerCount;i++){ if(window._tokenPicks[i]===undefined) window._tokenPicks[i]=i%TOKENS.length; }
@@ -330,9 +344,10 @@ renderSetupRows();
 document.getElementById('start-game-btn').onclick = ()=>{
   players = [];
   for(let i=0;i<playerCount;i++){
-    const name = document.getElementById('name-'+i).value.trim() || ('שחקן '+(i+1));
+    const isAI = document.getElementById('ai-'+i).checked;
+    const name = document.getElementById('name-'+i).value.trim() || (isAI?('מחשב '+(i+1)):('שחקן '+(i+1)));
     const tok = TOKENS[window._tokenPicks[i]];
-    players.push({name, icon:tok.icon, pos:0, money:1500, skipNext:false, bankrupt:false});
+    players.push({name, icon:tok.icon, pos:0, money:1500, skipNext:false, bankrupt:false, isAI});
   }
   chanceDeck = freshDeck(CHANCE_CARDS);
   communityDeck = freshDeck(COMMUNITY_CARDS);
@@ -342,6 +357,7 @@ document.getElementById('start-game-btn').onclick = ()=>{
   buildBoardDOM();
   renderAll();
   log('🎉 המשחק מתחיל! בהצלחה בדרך לחופה.');
+  maybeAITurn();
 };
 
 /* ===================== BOARD RENDER ===================== */
@@ -406,15 +422,24 @@ function renderAll(){
   renderPlayersBox();
   renderOwners();
   renderTurnBanner();
+  syncRollButton();
 }
 function renderTurnBanner(){
   const banner = document.getElementById('turn-banner');
   if(gameOver) return;
   const p = players[current];
-  banner.textContent = `תור ${p.icon} ${p.name}`;
+  banner.textContent = (p.isAI?'🤖 ':'')+`תור ${p.icon} ${p.name}`;
   document.getElementById('dice-row').textContent = diceFace(dice[0])+' '+diceFace(dice[1]);
 }
 function diceFace(n){ return ['','⚀','⚁','⚂','⚃','⚄','⚅'][n]; }
+function syncRollButton(){
+  const btn = document.getElementById('roll-btn');
+  if(!btn) return;
+  const p = players[current];
+  const aiTurn = !!(p && p.isAI);
+  btn.disabled = gameOver || processing || aiTurn;
+  btn.textContent = aiTurn ? '🤖 המחשב משחק...' : '🎲 הטל קוביות';
+}
 
 function renderPlayersBox(){
   const box = document.getElementById('players-box');
@@ -422,7 +447,7 @@ function renderPlayersBox(){
   players.forEach((p,i)=>{
     const row = document.createElement('div');
     row.className = 'player-card'+(i===current && !p.bankrupt?' active':'')+(p.bankrupt?' bankrupt':'');
-    row.innerHTML = `<span class="ic">${p.icon}</span><span class="nm">${p.name}${p.bankrupt?' (פשט רגל)':''}</span><span class="mn">${p.money} ❤</span>`;
+    row.innerHTML = `<span class="ic">${p.icon}</span><span class="nm">${p.isAI?'<span class=\"ai-badge\">מחשב</span>':''}${p.name}${p.bankrupt?' (פשט רגל)':''}</span><span class="mn">${p.money} ❤</span>`;
     box.appendChild(row);
   });
 }
@@ -469,49 +494,90 @@ function showModal(opts){
       <div class="mbtns" id="modal-btns"></div>
     `;
     const btnsWrap = document.getElementById('modal-btns');
+    let resolved = false;
+    const finish = (val)=>{ if(resolved) return; resolved = true; overlay.classList.add('hidden'); resolve(val); };
     (opts.buttons||[{label:'אישור', cls:'btn-main', value:true}]).forEach(b=>{
       const btn = document.createElement('button');
       btn.className = 'btn '+(b.cls||'btn-soft');
       btn.textContent = b.label;
-      btn.onclick = ()=>{ overlay.classList.add('hidden'); resolve(b.value); };
+      btn.onclick = ()=>finish(b.value);
       btnsWrap.appendChild(btn);
     });
     overlay.classList.remove('hidden');
+    if(opts.autoResolve!==undefined){
+      setTimeout(()=>finish(opts.autoResolve), opts.autoDelay||900);
+    }
   });
+}
+
+/* ===================== AI LOGIC ===================== */
+function aiShouldBuy(player, price){
+  return (player.money - price) >= 250;
+}
+function aiTryUpgrades(player){
+  const pIdx = players.indexOf(player);
+  const groups = {};
+  BOARD.filter(c=>c.type==='property').forEach(c=>{ (groups[c.group]=groups[c.group]||[]).push(c); });
+  let upgraded = 0;
+  Object.values(groups).forEach(cells=>{
+    if(upgraded>=3) return;
+    const ownsAll = cells.every(c=>c.owner===pIdx);
+    if(!ownsAll) return;
+    cells.forEach(c=>{
+      if(upgraded>=3) return;
+      const cost = Math.round(c.price*0.5);
+      if(c.level<5 && (player.money-cost)>=250){
+        player.money -= cost; c.level++; upgraded++;
+        log(`🤖 ${player.name} שדרג/ה את "${c.name}" ל${c.level===5?'הצעת נישואין 💍':'רמה '+c.level}.`);
+      }
+    });
+  });
+}
+function maybeAITurn(){
+  if(gameOver || processing) return;
+  const p = players[current];
+  if(p && p.isAI && !p.bankrupt){
+    setTimeout(()=>{ if(!processing && !gameOver) onRoll(); }, 700);
+  }
 }
 
 /* ===================== GAME LOGIC ===================== */
 async function onRoll(){
-  if(gameOver) return;
+  if(gameOver || processing) return;
+  processing = true;
   const p = players[current];
-  document.getElementById('roll-btn').disabled = true;
-
-  if(p.skipNext){
-    p.skipNext = false;
-    await showModal({title:'הפסד תור 😔', body:`${p.name} מפסיד/ה את התור הזה.`, tag:'סטטוס'});
-    document.getElementById('roll-btn').disabled = false;
-    nextPlayer(); renderAll();
-    return;
-  }
-
-  dice = [1+Math.floor(Math.random()*6), 1+Math.floor(Math.random()*6)];
-  const sum = dice[0]+dice[1];
-  renderTurnBanner();
-  log(`${p.icon} ${p.name} הטיל/ה ${dice[0]}+${dice[1]} = ${sum}`);
-
-  await movePlayerBy(p, sum, 0);
   renderAll();
-
-  if(!gameOver){
-    if(extraRoll){
-      extraRoll = false;
-      log(`${p.name} מקבל/ת הטלה נוספת!`);
-      document.getElementById('roll-btn').disabled = false;
-    } else {
-      nextPlayer();
-      renderAll();
-      document.getElementById('roll-btn').disabled = false;
+  try{
+    if(p.skipNext){
+      p.skipNext = false;
+      await showModal({title:'הפסד תור 😔', body:`${p.name} מפסיד/ה את התור הזה.`, tag:'סטטוס', autoResolve: p.isAI?true:undefined, autoDelay:700});
+      if(!p.bankrupt) nextPlayer();
+      return;
     }
+
+    dice = [1+Math.floor(Math.random()*6), 1+Math.floor(Math.random()*6)];
+    const sum = dice[0]+dice[1];
+    renderTurnBanner();
+    log(`${p.icon} ${p.name} הטיל/ה ${dice[0]}+${dice[1]} = ${sum}`);
+
+    await movePlayerBy(p, sum, 0);
+
+    if(!gameOver && !p.bankrupt && p.isAI){
+      aiTryUpgrades(p);
+    }
+
+    if(!gameOver){
+      if(extraRoll){
+        extraRoll = false;
+        log(`${p.name} מקבל/ת הטלה נוספת!`);
+      } else if(!p.bankrupt){
+        nextPlayer();
+      }
+    }
+  } finally {
+    processing = false;
+    renderAll();
+    maybeAITurn();
   }
 }
 
@@ -548,14 +614,14 @@ async function handleLanding(player, pos, depth){
       break;
     case 'corner-lose':
       player.skipNext = true;
-      await showModal({title:cell.name, body:cell.sub, tag:'משבצת מיוחדת'});
+      await showModal({title:cell.name, body:cell.sub, tag:'משבצת מיוחדת', autoResolve: player.isAI?true:undefined});
       log(`${player.name} נחת/ה ב"${cell.name}" — יפסיד/תפסיד את התור הבא.`);
       break;
     case 'corner-win':
       await triggerWin(player);
       break;
     case 'corner-gotostart':
-      await showModal({title:cell.name, body:cell.sub, tag:'משבצת מיוחדת'});
+      await showModal({title:cell.name, body:cell.sub, tag:'משבצת מיוחדת', autoResolve: player.isAI?true:undefined});
       teleport(player, 0);
       log(`${player.name} נחת/ה ב"${cell.name}" וחזר/ה להתחלה.`);
       renderAll();
@@ -571,22 +637,22 @@ async function handleLanding(player, pos, depth){
       await handleUtilityLanding(player, cell);
       break;
     case 'fee':
-      await showModal({title:cell.name, body:`שלם ${cell.amount} לבבות.`, tag:'תשלום', tagClass:'tag-chance'});
+      await showModal({title:cell.name, body:`שלם ${cell.amount} לבבות.`, tag:'תשלום', tagClass:'tag-chance', autoResolve: player.isAI?true:undefined});
       payBank(player, cell.amount);
       log(`${player.name} שילם/ה ${cell.amount} לבבות (${cell.name}).`);
       break;
     case 'move':
-      await showModal({title:cell.name, body:`${cell.amount>0?'התקדם':'חזור'} ${Math.abs(cell.amount)} משבצות.`, tag:'משבצת מיוחדת'});
+      await showModal({title:cell.name, body:`${cell.amount>0?'התקדם':'חזור'} ${Math.abs(cell.amount)} משבצות.`, tag:'משבצת מיוחדת', autoResolve: player.isAI?true:undefined});
       await movePlayerBy(player, cell.amount, depth+1);
       break;
     case 'loseturn':
       player.skipNext = true;
-      await showModal({title:cell.name, body:'הפסד תור.', tag:'משבצת מיוחדת'});
+      await showModal({title:cell.name, body:'הפסד תור.', tag:'משבצת מיוחדת', autoResolve: player.isAI?true:undefined});
       log(`${player.name} נחת/ה ב"${cell.name}" — יפסיד/תפסיד תור.`);
       break;
     case 'rollagain':
       extraRoll = true;
-      await showModal({title:cell.name, body:'גלגל/י שוב!', tag:'משבצת מיוחדת'});
+      await showModal({title:cell.name, body:'גלגל/י שוב!', tag:'משבצת מיוחדת', autoResolve: player.isAI?true:undefined});
       log(`${player.name} נחת/ה ב"${cell.name}" — מקבל/ת הטלה נוספת.`);
       break;
     case 'chance':
@@ -603,7 +669,8 @@ async function handlePropertyLanding(player, cell){
     if(player.money>=cell.price){
       const buy = await showModal({
         title:cell.name, body:`לקנות את "${cell.name}" עבור ${cell.price} לבבות?`, tag:'נכס פנוי',
-        buttons:[{label:'💍 קונה',cls:'btn-main',value:true},{label:'לא תודה',cls:'btn-soft',value:false}]
+        buttons:[{label:'💍 קונה',cls:'btn-main',value:true},{label:'לא תודה',cls:'btn-soft',value:false}],
+        autoResolve: player.isAI ? aiShouldBuy(player, cell.price) : undefined
       });
       if(buy){ cell.owner = players.indexOf(player); player.money -= cell.price; log(`${player.name} רכש/ה את "${cell.name}" עבור ${cell.price} לבבות.`); }
     } else {
@@ -612,7 +679,7 @@ async function handlePropertyLanding(player, cell){
   } else if(cell.owner !== players.indexOf(player)){
     const owner = players[cell.owner];
     const rent = cell.rentBase * LEVEL_MULT[cell.level];
-    await showModal({title:cell.name, body:`הנכס שייך ל-${owner.name}. שלם/י ${rent} לבבות.`, tag:'דמי שכירות', tagClass:'tag-chance'});
+    await showModal({title:cell.name, body:`הנכס שייך ל-${owner.name}. שלם/י ${rent} לבבות.`, tag:'דמי שכירות', tagClass:'tag-chance', autoResolve: player.isAI?true:undefined});
     payToPlayer(player, owner, rent);
     log(`${player.name} שילם/ה ${rent} לבבות שכירות ל${owner.name} (${cell.name}).`);
   }
@@ -622,14 +689,15 @@ async function handleStationLanding(player, cell){
   if(cell.owner===null){
     if(player.money>=cell.price){
       const buy = await showModal({title:cell.name, body:`לקנות עבור ${cell.price} לבבות?`, tag:'תחנה פנויה',
-        buttons:[{label:'🚗 קונה',cls:'btn-main',value:true},{label:'לא תודה',cls:'btn-soft',value:false}]});
+        buttons:[{label:'🚗 קונה',cls:'btn-main',value:true},{label:'לא תודה',cls:'btn-soft',value:false}],
+        autoResolve: player.isAI ? aiShouldBuy(player, cell.price) : undefined});
       if(buy){ cell.owner = players.indexOf(player); player.money -= cell.price; log(`${player.name} רכש/ה את "${cell.name}".`); }
     }
   } else if(cell.owner !== players.indexOf(player)){
     const owner = players[cell.owner];
     const count = BOARD.filter(c=>c.type==='station' && c.owner===cell.owner).length;
     const rent = STATION_RENT[count];
-    await showModal({title:cell.name, body:`התחנה שייכת ל-${owner.name}. שלם/י ${rent} לבבות.`, tag:'דמי שכירות', tagClass:'tag-chance'});
+    await showModal({title:cell.name, body:`התחנה שייכת ל-${owner.name}. שלם/י ${rent} לבבות.`, tag:'דמי שכירות', tagClass:'tag-chance', autoResolve: player.isAI?true:undefined});
     payToPlayer(player, owner, rent);
     log(`${player.name} שילם/ה ${rent} לבבות (${cell.name}).`);
   }
@@ -639,14 +707,15 @@ async function handleUtilityLanding(player, cell){
   if(cell.owner===null){
     if(player.money>=cell.price){
       const buy = await showModal({title:cell.name, body:`לקנות עבור ${cell.price} לבבות?`, tag:'שירות פנוי',
-        buttons:[{label:'☎ קונה',cls:'btn-main',value:true},{label:'לא תודה',cls:'btn-soft',value:false}]});
+        buttons:[{label:'☎ קונה',cls:'btn-main',value:true},{label:'לא תודה',cls:'btn-soft',value:false}],
+        autoResolve: player.isAI ? aiShouldBuy(player, cell.price) : undefined});
       if(buy){ cell.owner = players.indexOf(player); player.money -= cell.price; log(`${player.name} רכש/ה את "${cell.name}".`); }
     }
   } else if(cell.owner !== players.indexOf(player)){
     const owner = players[cell.owner];
     const count = BOARD.filter(c=>c.type==='utility' && c.owner===cell.owner).length;
     const rent = (dice[0]+dice[1]) * (count===1?4:10);
-    await showModal({title:cell.name, body:`השירות שייך ל-${owner.name}. שלם/י ${rent} לבבות.`, tag:'דמי שכירות', tagClass:'tag-chance'});
+    await showModal({title:cell.name, body:`השירות שייך ל-${owner.name}. שלם/י ${rent} לבבות.`, tag:'דמי שכירות', tagClass:'tag-chance', autoResolve: player.isAI?true:undefined});
     payToPlayer(player, owner, rent);
     log(`${player.name} שילם/ה ${rent} לבבות (${cell.name}).`);
   }
@@ -664,7 +733,8 @@ async function drawAndApply(deckName, player, depth){
     title: deckName==='chance' ? '🎀 קלף הפתעה' : '📦 קלף קופת הקהילה',
     body: card.text,
     tag: deckName==='chance' ? 'הפתעה' : 'קופת הקהילה',
-    tagClass: deckName==='chance' ? 'tag-chance' : 'tag-community'
+    tagClass: deckName==='chance' ? 'tag-chance' : 'tag-community',
+    autoResolve: player.isAI ? true : undefined
   });
   log(`${player.name} שלף/ה: "${card.text}"`);
 
@@ -729,7 +799,7 @@ function checkBankrupt(player){
     const active = players.filter(p=>!p.bankrupt);
     if(active.length===1){
       gameOver = true;
-      setTimeout(()=>showModal({title:'🏆 ניצחון!', body:`${active[0].name} הוא/היא הזוכה האחרון/ה במשחק!`, tag:'סוף המשחק'}),100);
+      setTimeout(()=>showModal({title:'🏆 ניצחון!', body:`${active[0].name} הוא/היא הזוכה האחרון/ה במשחק!`, tag:'סוף המשחק', autoResolve: active[0].isAI?true:undefined}),100);
     } else if(current===players.indexOf(player)){
       nextPlayer();
     }
@@ -738,7 +808,7 @@ function checkBankrupt(player){
 
 async function triggerWin(player){
   gameOver = true;
-  await showModal({title:'🏆 מזל טוב! 💍', body:`${player.icon} ${player.name} הגיע/ה לחופה לפני כולם — ניצחת במשחק!`, tag:'אירוסין', tagClass:'tag-chance'});
+  await showModal({title:'🏆 מזל טוב! 💍', body:`${player.icon} ${player.name} הגיע/ה לחופה לפני כולם — ניצחת במשחק!`, tag:'אירוסין', tagClass:'tag-chance', autoResolve: player.isAI?true:undefined});
   log(`🎊 ${player.name} ניצח/ה במשחק והגיע/ה לחופה!`);
 }
 
