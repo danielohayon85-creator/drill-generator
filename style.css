@@ -493,6 +493,47 @@ select.form-control {
 .export-title { font-size: 14.5px; font-weight: 700; color: var(--gray-900); margin-bottom: 6px; }
 .export-desc { font-size: 11.5px; color: var(--gray-500); margin-bottom: 16px; }
 
+/* ─── User management (admin) ─── */
+.users-head {
+  display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--gray-600);
+  margin-bottom: 16px;
+}
+.users-head .dot { color: var(--gray-300); }
+.user-group {
+  background: white; border: 1px solid var(--gray-200); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px;
+}
+.user-group-head {
+  display: flex; align-items: center; gap: 8px; padding: 12px 18px;
+  background: var(--gray-50); border-bottom: 1px solid var(--gray-200);
+  font-size: 13px; font-weight: 700; color: var(--gray-700);
+}
+.user-group-head.admins { background: var(--primary-light); color: var(--primary-dark); border-bottom-color: #bcd9f2; }
+.user-count {
+  font-size: 11px; font-weight: 700; background: var(--gray-200); color: var(--gray-600);
+  padding: 1px 9px; border-radius: 10px;
+}
+.user-count.admins { background: var(--primary); color: white; }
+.user-group-empty { padding: 24px; text-align: center; color: var(--gray-400); font-size: 13px; }
+.user-row {
+  display: flex; align-items: center; gap: 14px; padding: 12px 18px;
+  border-bottom: 1px solid var(--gray-100); transition: background .12s;
+}
+.user-row:last-child { border-bottom: none; }
+.user-row:hover { background: var(--gray-50); }
+.user-row.disabled { opacity: .55; }
+.user-avatar {
+  width: 36px; height: 36px; border-radius: var(--radius); flex-shrink: 0;
+  background: var(--gray-100); color: var(--gray-600);
+  display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;
+}
+.user-avatar.admin { background: var(--primary-light); color: var(--primary); }
+.user-info { flex: 1; min-width: 0; }
+.user-info-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.user-email { font-weight: 600; font-size: 13.5px; color: var(--gray-800); direction: ltr; }
+.user-meta { font-size: 11.5px; color: var(--gray-500); margin-top: 2px; }
+.user-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
 /* ─── Empty state ─── */
 .empty-state { text-align: center; padding: 60px 20px; color: var(--gray-500); }
 .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: .6; }

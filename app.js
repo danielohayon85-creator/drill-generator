@@ -81,24 +81,28 @@ function initFirebase() {
 }
 
 async function ensureUserDoc(user) {
-  if (!fbDb) return;
+  if (!fbDb) return null;
   const ref = fbDb.collection('users').doc(user.uid);
   try {
     const snap = await ref.get();
     if (!snap.exists) {
-      await ref.set({
+      const data = {
         email: user.email,
+        role: 'user',
+        disabled: false,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
         loginCount: 1,
-      });
-    } else {
-      await ref.update({
-        lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
-        loginCount: firebase.firestore.FieldValue.increment(1),
-      });
+      };
+      await ref.set(data);
+      return data;
     }
-  } catch (e) { console.warn('ensureUserDoc failed', e); }
+    await ref.update({
+      lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+      loginCount: firebase.firestore.FieldValue.increment(1),
+    });
+    return snap.data();
+  } catch (e) { console.warn('ensureUserDoc failed', e); return null; }
 }
 
 async function logActivity(action, details = {}) {
@@ -1837,23 +1841,88 @@ const TEMPLATE = /* html */`
       <div class="empty-sub mt-2">טוען נתונים...</div>
     </div>
     <div v-else>
-      <div class="card mb-6">
-        <div class="card-header"><span class="card-title"><iconify-icon icon="fluent:people-24-regular" aria-hidden="true"></iconify-icon> משתמשים ({{ adminUsers.length }})</span></div>
-        <div style="overflow-x:auto">
-          <table class="anchor-table">
-            <thead><tr><th>דוא"ל</th><th>נוצר</th><th>התחברות אחרונה</th><th>מס' התחברויות</th></tr></thead>
-            <tbody>
-              <tr v-for="u in adminUsers" :key="u.id">
-                <td style="direction:ltr;text-align:right">{{ u.email }}</td>
-                <td>{{ fmtTimestamp(u.createdAt) }}</td>
-                <td>{{ fmtTimestamp(u.lastLogin) }}</td>
-                <td>{{ u.loginCount || 1 }}</td>
-              </tr>
-              <tr v-if="adminUsers.length===0"><td colspan="4" style="text-align:center;color:var(--gray-500)">אין משתמשים עדיין</td></tr>
-            </tbody>
-          </table>
+      <div class="users-head">
+        <span>{{ adminUsers.length }} משתמשים במערכת</span>
+        <span class="dot">·</span>
+        <span>{{ adminUsers.filter(u=>!u.disabled).length }} פעילים</span>
+      </div>
+
+      <div class="user-group">
+        <div class="user-group-head admins">
+          <iconify-icon icon="fluent:shield-checkmark-24-regular" aria-hidden="true"></iconify-icon>
+          <span>מנהלים</span>
+          <span class="user-count admins">{{ adminUsers.filter(u=>u.role==='admin').length }}</span>
+        </div>
+        <div v-if="adminUsers.filter(u=>u.role==='admin').length===0" class="user-group-empty">אין מנהלים</div>
+        <div v-for="u in adminUsers.filter(u=>u.role==='admin')" :key="u.id" class="user-row" :class="{disabled: u.disabled}">
+          <div class="user-avatar admin">{{ (u.email||'?').charAt(0).toUpperCase() }}</div>
+          <div v-if="editUserId!==u.id" class="user-info">
+            <div class="user-info-top">
+              <span class="user-email">{{ u.email }}</span>
+              <span v-if="authUser && u.id===authUser.uid" class="badge badge-blue">אתה</span>
+              <span v-if="u.disabled" class="badge badge-red">מושבת</span>
+            </div>
+            <div class="user-meta">התחבר {{ u.loginCount||1 }} פעמים · אחרון: {{ fmtTimestamp(u.lastLogin) }}</div>
+          </div>
+          <div v-else class="user-info">
+            <select v-model="editUserRole" class="form-control" style="max-width:160px;display:inline-block">
+              <option value="user">משתמש</option>
+              <option value="admin">מנהל</option>
+            </select>
+          </div>
+          <div class="user-actions">
+            <template v-if="editUserId===u.id">
+              <button class="btn btn-success btn-sm" @click="saveEditUser(u)">שמור</button>
+              <button class="btn btn-ghost btn-sm" @click="cancelEditUser">ביטול</button>
+            </template>
+            <template v-else>
+              <span class="badge" :class="u.role==='admin' ? 'badge-blue' : 'badge-gray'">{{ u.role==='admin' ? 'מנהל' : 'משתמש' }}</span>
+              <button class="btn btn-ghost btn-sm" @click="startEditUser(u)">ערוך</button>
+              <button class="btn btn-sm" :class="u.disabled ? 'btn-success' : 'btn-ghost'" :disabled="authUser && u.id===authUser.uid" @click="toggleUserDisabled(u)">{{ u.disabled ? 'הפעל' : 'השבת' }}</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--red)" :disabled="authUser && u.id===authUser.uid" @click="removeUserProfile(u)"><iconify-icon icon="fluent:delete-24-regular" aria-hidden="true"></iconify-icon></button>
+            </template>
+          </div>
         </div>
       </div>
+
+      <div class="user-group">
+        <div class="user-group-head">
+          <iconify-icon icon="fluent:people-24-regular" aria-hidden="true"></iconify-icon>
+          <span>משתמשים</span>
+          <span class="user-count">{{ adminUsers.filter(u=>u.role!=='admin').length }}</span>
+        </div>
+        <div v-if="adminUsers.filter(u=>u.role!=='admin').length===0" class="user-group-empty">אין משתמשים</div>
+        <div v-for="u in adminUsers.filter(u=>u.role!=='admin')" :key="u.id" class="user-row" :class="{disabled: u.disabled}">
+          <div class="user-avatar">{{ (u.email||'?').charAt(0).toUpperCase() }}</div>
+          <div v-if="editUserId!==u.id" class="user-info">
+            <div class="user-info-top">
+              <span class="user-email">{{ u.email }}</span>
+              <span v-if="authUser && u.id===authUser.uid" class="badge badge-blue">אתה</span>
+              <span v-if="u.disabled" class="badge badge-red">מושבת</span>
+            </div>
+            <div class="user-meta">התחבר {{ u.loginCount||1 }} פעמים · אחרון: {{ fmtTimestamp(u.lastLogin) }}</div>
+          </div>
+          <div v-else class="user-info">
+            <select v-model="editUserRole" class="form-control" style="max-width:160px;display:inline-block">
+              <option value="user">משתמש</option>
+              <option value="admin">מנהל</option>
+            </select>
+          </div>
+          <div class="user-actions">
+            <template v-if="editUserId===u.id">
+              <button class="btn btn-success btn-sm" @click="saveEditUser(u)">שמור</button>
+              <button class="btn btn-ghost btn-sm" @click="cancelEditUser">ביטול</button>
+            </template>
+            <template v-else>
+              <span class="badge badge-gray">משתמש</span>
+              <button class="btn btn-ghost btn-sm" @click="startEditUser(u)">ערוך</button>
+              <button class="btn btn-sm" :class="u.disabled ? 'btn-success' : 'btn-ghost'" @click="toggleUserDisabled(u)">{{ u.disabled ? 'הפעל' : 'השבת' }}</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--red)" @click="removeUserProfile(u)"><iconify-icon icon="fluent:delete-24-regular" aria-hidden="true"></iconify-icon></button>
+            </template>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header"><span class="card-title"><iconify-icon icon="fluent:document-text-24-regular" aria-hidden="true"></iconify-icon> יומן פעילות ({{ adminLogs.length }} אחרונים)</span></div>
         <div style="overflow-x:auto">
@@ -2114,6 +2183,9 @@ Vue.createApp({
       adminLogs: [],
       adminUsers: [],
       adminLoading: false,
+      currentUserRole: 'user',
+      editUserId: null,
+      editUserRole: 'user',
       // expose constants to template
       SCENARIOS, SEC_SCENARIOS, UNITS, RELIABILITY, EXERCISE_TYPES, AI_PROVIDERS,
       wizardSteps: ['פרמטרים','תרחיש','מכלולים','הזרמות','עריכה','אוכלוסייה','ציפיות'],
@@ -2143,7 +2215,9 @@ Vue.createApp({
       return p ? p.name : 'AI';
     },
     isAuthConfigured() { return !!fbAuth; },
-    isAdmin() { return !!(this.authUser && typeof ADMIN_EMAILS !== 'undefined' && ADMIN_EMAILS.includes(this.authUser.email)); },
+    isAdmin() {
+      return !!(this.authUser && ((typeof ADMIN_EMAILS !== 'undefined' && ADMIN_EMAILS.includes(this.authUser.email)) || this.currentUserRole === 'admin'));
+    },
   },
   methods: {
     async authLogin() {
@@ -2193,6 +2267,38 @@ Vue.createApp({
         deleted_exercise:'מחיקת תרגיל', duplicated_exercise:'שכפול תרגיל',
         export_csv:'ייצוא CSV', export_word:'ייצוא Word', export_pptx:'ייצוא PowerPoint',
       }[a] || a;
+    },
+    async toggleUserDisabled(u) {
+      if (u.id === this.authUser.uid) { this.toast('לא ניתן להשבית את עצמך','warning'); return; }
+      try {
+        await fbDb.collection('users').doc(u.id).update({ disabled: !u.disabled });
+        u.disabled = !u.disabled;
+        this.toast(u.disabled ? 'המשתמש הושבת' : 'המשתמש הופעל', 'info');
+      } catch(e) { this.toast('שגיאה: '+e.message, 'error'); }
+    },
+    startEditUser(u) { this.editUserId = u.id; this.editUserRole = u.role || 'user'; },
+    cancelEditUser() { this.editUserId = null; },
+    async saveEditUser(u) {
+      try {
+        await fbDb.collection('users').doc(u.id).update({ role: this.editUserRole });
+        if (this.editUserRole === 'admin') {
+          await fbDb.collection('admins').doc(u.id).set({ promotedBy: this.authUser.email, promotedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        } else {
+          await fbDb.collection('admins').doc(u.id).delete();
+        }
+        u.role = this.editUserRole;
+        this.editUserId = null;
+        this.toast('התפקיד עודכן','success');
+      } catch(e) { this.toast('שגיאה: '+e.message, 'error'); }
+    },
+    async removeUserProfile(u) {
+      if (u.id === this.authUser.uid) { this.toast('לא ניתן להסיר את עצמך','warning'); return; }
+      if (!confirm(`להסיר את ${u.email} מהרשימה?\nשים לב: זה לא חוסם התחברות עתידית — לחסימה אמיתית יש להשבית.`)) return;
+      try {
+        await fbDb.collection('users').doc(u.id).delete();
+        this.adminUsers = this.adminUsers.filter(x=>x.id!==u.id);
+        this.toast('המשתמש הוסר מהרשימה','info');
+      } catch(e) { this.toast('שגיאה: '+e.message, 'error'); }
     },
 
     startNew() { this.draft = emptyDraft(); this.step = 1; this.editingInjId = null; this.view = 'wizard'; },
@@ -2635,11 +2741,23 @@ Vue.createApp({
     initFirebase();
     if (fbAuth) {
       fbAuth.onAuthStateChanged(async (user) => {
-        this.authUser = user;
-        this.authReady = true;
         if (user) {
-          await ensureUserDoc(user);
+          const data = await ensureUserDoc(user);
+          if (data && data.disabled) {
+            this.authError = 'חשבונך הושבת על ידי מנהל המערכת.';
+            await fbAuth.signOut();
+            this.authUser = null;
+            this.authReady = true;
+            return;
+          }
+          this.currentUserRole = data ? (data.role || 'user') : 'user';
+          this.authUser = user;
+          this.authReady = true;
           await logActivity('login');
+        } else {
+          this.authUser = null;
+          this.currentUserRole = 'user';
+          this.authReady = true;
         }
       });
     } else {

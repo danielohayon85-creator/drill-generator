@@ -5,10 +5,11 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function isAdmin() { return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
 
-    // כל משתמש מחובר יכול לקרוא/לעדכן את מסמך עצמו; אדמין יכול לקרוא את כולם
+    // כל משתמש מחובר יכול לקרוא/לעדכן את מסמך עצמו; אדמין יכול לקרוא/לעדכן/למחוק את כל המשתמשים
+    // (אישור מפורש של המשתמש: אדמין מקבל הרשאות מלאות לניהול משתמשים אחרים, כולל אדמינים אחרים)
     match /users/{userId} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
-      allow read: if isAdmin();
+      allow read, update, delete: if isAdmin();
     }
 
     // כל משתמש מחובר יכול לכתוב רישום פעילות על עצמו בלבד; רק אדמין יכול לקרוא את כל היומן
@@ -17,10 +18,11 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
-    // רשימת מי שמוגדר אדמין — ניתן לקריאה לכל מחובר (כדי לדעת אם הוא עצמו אדמין), כתיבה רק דרך מסוף Firebase
+    // רשימת מי שמוגדר אדמין — ניתן לקריאה לכל מחובר (כדי לדעת אם הוא עצמו אדמין).
+    // קידום/הדחה דרך האפליקציה אפשרי לכל אדמין קיים (אדמין הראשון נוצר ידנית במסוף Firebase)
     match /admins/{userId} {
       allow read: if isSignedIn();
-      allow write: if false;
+      allow write: if isAdmin();
     }
   }
 }
