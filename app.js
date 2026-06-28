@@ -257,70 +257,6 @@ function buildInjectionPrompt(draft) {
 [{"time":"HH:MM","reporter":"...","type":"אירוע|דיווח|פקודה|עדכון|בקשה|מידע מודיעיני|הנחיה|אזהרה","content":"...","expectedAction":"...","reliability":"A|B|C|D"}]`;
 }
 
-function buildStoryPrompt(draft) {
-  const scenarioNames = {
-    earthquake:'רעידת אדמה', mass_cas:'פיגוע / אירוע רב נפגעים', fire:'שריפה נרחבת',
-    flood:'הצפה ושיטפון', chemical:'אירוע כימ"ב / חומ"ס', combat:'ירי רקטות / פגיעת טיל',
-    traffic:'אסון תחבורה / ר"נ', infra:'קריסת תשתיות',
-  };
-  const SINGLE_SITE = ['combat','chemical','traffic','mass_cas'];
-  const zoneCount = SINGLE_SITE.includes(draft.mainScenario) ? 1 : ({1:1,2:2,3:3}[draft.complexity]||2);
-  const realStreets = getCityStreets(draft.location);
-  const streetsLine = realStreets && realStreets.length
-    ? `\n• רחובות אמיתיים ב${draft.location} לשימוש (חובה להשתמש רק באלה, לא להמציא רחובות): ${realStreets.slice(0,12).join(', ')}`
-    : '';
-  return `אתה מומחה לבניית תרגילי חירום בישראל.
-
-כתוב סיפור אוכלוסייה מלא לתרגיל:
-• תרחיש: ${scenarioNames[draft.mainScenario]||draft.mainScenario}
-• מיקום: ${draft.location}
-• גודל אוכלוסייה: ${draft.populationSize.toLocaleString('he-IL')} תושבים
-• שעת פתיחה: ${draft.startTime}
-• מספר זירות: ${zoneCount}${zoneCount===1 ? ' (נקודת פגיעה יחידה — זירה אחת מורכבת ורוויית אירועים, לא לפצל למספר זירות)' : ''}${streetsLine}
-
-מבנה נדרש (כתוב בדיוק כך). חובה להשתמש רק ברחובות האמיתיים שצוינו לעיל (אם צוינו) בכל מקום שמוזכר "[שם]" רחוב:
-
-══════════════════════════════════════════════
-סיפור כללי
-══════════════════════════════════════════════
-[תיאור הרקע, האזעקה/האירוע, נפילות/נזקים ראשוניים]
-
-═══════════════════════════════════════════
-זירה X: רחוב [שם] [מספר]
-═══════════════════════════════════════════
-מיקום:              רח' [שם] [מספר], ${draft.location}
-שעת דיווח ראשוני:  HH:MM
-סוג אתר:           [בניין מגורים / מוסד ציבורי / בית פרטי / כולל / מפעל]
-אוכלוסייה באתר:    X נפשות
-
-רקע:
-[מה קרה בזירה]
-
-אוכלוסייה בזירה לפי קומות:
-  קומה 1: X נפשות [הערה אופציונלית]
-  קומה 2: X נפשות
-
-סיכום נפגעים:
-  • הרוגים:           X
-  • פצועים קשים:      X
-  • פצועים בינוניים:  X
-  • פצועים קלים:      X
-  • לכודים:           X
-  • נעדרים:           X
-
-[חזור לכל זירה]
-
-══════════════════════════════════════════════
-טבלת סיכום זירות
-══════════════════════════════════════════════
-[שורה לכל זירה | מיקום | שעת דיווח | סוג אתר | אוכ' | הרוגים | פצועים | לכודים]
-סה"כ: [סיכום כולל]
-
-משך התרגיל: ${draft.durationHours} שעות | רמת מורכבות: ${{1:'קלה',2:'בינונית',3:'גבוהה'}[draft.complexity]}
-
-עברית ריאליסטית, כמו תיק תרגיל אמיתי.`;
-}
-
 /* ═══════════════════════════════════════════════════
    INJECTION TEMPLATES  (relOffset = 0..1 over duration)
 ═══════════════════════════════════════════════════ */
@@ -733,6 +669,163 @@ function renderBeatsTable(beats, baseMin) {
   return `${header}\n${rows}`;
 }
 
+// בונה את בלוק הטקסט של זירה בודדת — משמש גם למחולל מבוסס-תבניות וגם לסיפור שנוצר ב-AI
+function renderZoneBlock(z, location, street, houseNum, siteType, popAtSite, reportTime, background, roster, beatLines, finalKilled, serious, mod, light, trapped) {
+  return `
+═══════════════════════════════════════════
+זירה ${z} – ${location}, רחוב ${street} ${houseNum}
+═══════════════════════════════════════════
+מיקום: רחוב ${street} ${houseNum}
+שעת דיווח על נפילה: ${reportTime}
+סוג אתר: ${siteType}
+
+סיפור רקע:
+${background}
+
+רשימת אוכלוסייה
+${roster}
+סה"כ: ${popAtSite} אנשים באתר.
+
+דיווחים:
+${beatLines}
+
+סיכום נפגעים בזירה: ${finalKilled} הרוגים, ${serious+mod+light} פצועים בדרגות שונות (${serious} קשה / ${mod} בינוני / ${light} קל), ${trapped} לכודים שחולצו, 0 נעדרים.
+`;
+}
+
+// בונה את מעטפת הסיפור המלאה (כללי + זירות + טבלת סיכום) — משותף לשני מקורות הנתונים
+function renderFullStory(draft, intro, zoneBlocks, summaryRows, severity, secText) {
+  const { populationSize, durationHours, complexity } = draft;
+  const summaryHeader = `${'─'.repeat(80)}\n זירה        | מיקום                 | דיווח  | סוג אתר          | אוכ' | הרוגים | פצועים | לכודים\n${'─'.repeat(80)}`;
+  const summaryBody = summaryRows.map(r =>
+    ` זירה ${r.z}      | רח' ${r.street} ${r.houseNum}`.padEnd(24) +
+    `| ${r.reportTime}  | ${r.siteType.slice(0,16).padEnd(16)} | ${String(r.popAtSite).padEnd(4)} | ${String(r.killed).padEnd(6)} | ${String(r.injured).padEnd(6)} | ${r.trapped}`
+  ).join('\n');
+  const totKilled  = summaryRows.reduce((s,r)=>s+r.killed,0);
+  const totInjured = summaryRows.reduce((s,r)=>s+r.injured,0);
+  const totTrapped = summaryRows.reduce((s,r)=>s+r.trapped,0);
+  const summaryFooter = `${'─'.repeat(80)}\nסה"כ: ${totKilled} הרוגים | ${totInjured} פצועים (${severity.serious} קשים / ${severity.mod} בינוניים / ${severity.light} קלים) | ${totTrapped} לכודים (חולצו) | 0 נעדרים`;
+
+  return `══════════════════════════════════════════════
+סיפור כללי
+══════════════════════════════════════════════
+${intro}
+
+אוכלוסיית הרשות: ${populationSize.toLocaleString('he-IL')} תושבים
+כ-${Math.round(populationSize*0.15).toLocaleString('he-IL')} אוכלוסיות רגישות (קשישים, ילדים, אנשים עם מוגבלויות)
+
+מרכזי מידע ותמיכה שנפתחו:
+• מוקד 106 — ${pick(['בניין העירייה','מרכז קהילתי','אולם ספורט'])}
+• מרכז משפחות — סמוך לאתר, בניהול הרשות המקומית
+• ${Math.max(2,Math.round(populationSize/5000))} מרכזי כינוס ופינוי${secText}
+${zoneBlocks.join('')}
+══════════════════════════════════════════════
+טבלת סיכום זירות
+══════════════════════════════════════════════
+${summaryHeader}
+${summaryBody}
+${summaryFooter}
+
+משך התרגיל: ${durationHours} שעות | רמת מורכבות: ${{1:'קלה',2:'בינונית',3:'גבוהה'}[complexity]}`;
+}
+
+function buildStoryJsonPrompt(draft) {
+  const scenarioNames = {
+    earthquake:'רעידת אדמה', mass_cas:'פיגוע / אירוע רב נפגעים', fire:'שריפה נרחבת',
+    flood:'הצפה ושיטפון', chemical:'אירוע כימ"ב / חומ"ס', combat:'ירי רקטות / פגיעת טיל',
+    traffic:'אסון תחבורה / ר"נ', infra:'קריסת תשתיות',
+  };
+  const SINGLE_SITE = ['combat','chemical','traffic','mass_cas'];
+  const zoneCount = SINGLE_SITE.includes(draft.mainScenario) ? 1 : ({1:1,2:2,3:3}[draft.complexity]||2);
+  const realStreets = getCityStreets(draft.location);
+  const streetsLine = realStreets && realStreets.length
+    ? `\nרחובות אמיתיים ב${draft.location} לשימוש (חובה להשתמש רק באלה, לא להמציא): ${realStreets.slice(0,12).join(', ')}`
+    : '';
+  return `אתה מומחה לבניית תרגילי חירום למפקדות נפה של פיקוד העורף בישראל.
+
+בנה סיפור אוכלוסייה מלא ומפורט לתרגיל, עם אוכלוסייה בעלת שם מלא (לא רק מספרים מצטברים):
+• תרחיש: ${scenarioNames[draft.mainScenario]||draft.mainScenario}
+• מיקום: ${draft.location}
+• גודל אוכלוסייה: ${draft.populationSize.toLocaleString('he-IL')} תושבים
+• שעת פתיחה: ${draft.startTime}
+• מספר זירות: ${zoneCount}${zoneCount===1 ? ' (נקודת פגיעה יחידה — זירה אחת מורכבת ורוויית אירועים, לא לפצל)' : ''}${streetsLine}
+
+הנחיות לכל זירה:
+1. אוכלוסייה בעלת שם: שם פרטי + שם משפחה עברי ריאליסטי + גיל לכל אדם (8–35 אנשים בזירה).
+2. אם סוג האתר הוא "בניין מגורים"/"בית פרטי": חלק את הדיירים לקומות ודירות (floor, apt — מספרים), עם משפחות (שם משפחה משותף לדירה).
+3. אם סוג האתר הוא "מפעל / מחסן"/"מוסד ציבורי"/"מוסד חינוכי"/"בניין משרדים"/"כולל / ישיבה": הקצה role (תפקיד) לכל אדם במקום floor/apt (שניהם null).
+4. status סופי לכל אדם: רוב "ידוע בטוח" או "פונה"; חלק "פצוע קל"/"פצוע בינוני"/"פצוע קשה"; מיעוט "לכוד" (יחולץ) או "הרוג"; 1-3 אנשים "אותר בטוח" (דיווחו עליהם כנעדרים, התבררו בטוחים).
+5. ציר "beats" לזירה (8-12 דיווחים): התראה ראשונית → "חפ"ק גדוד מגיע לזירה" (כ-15-20 דק' אחרי הפגיעה, גורם "גדוד") ומתחיל לאסוף תמונת מצב → דיווחי איתור פצועים/לכודים בשם → "תמ"צ גדוד: X הרוגים, Y פצועים, Z לכודים, W נעדרים" → עדכון חילוץ → פתרון נעדרים בשם ("מתברר כי [שם] לא היה בזירה") → "תמ"צ סופי לזירה". גורם מדווח (reporter): "כוחות בשטח" / "גדוד" / "לוחמי חילוץ" / "אזרחים" / "מש"ק אוכלוסייה".
+6. חובה להשתמש רק ברחובות האמיתיים שצוינו לעיל (אם צוינו).
+
+החזר JSON בלבד, ללא markdown, ללא הסבר, במבנה המדויק הבא:
+{"intro":"תיאור פתיחה כללי","zones":[{"street":"...","houseNum":0,"siteType":"בניין מגורים|מוסד ציבורי|בית פרטי|מפעל / מחסן|מוסד חינוכי|בניין משרדים|כולל / ישיבה","reportTime":"HH:MM","background":"תיאור הרקע בזירה","residents":[{"firstName":"...","lastName":"...","age":0,"floor":1,"apt":1,"role":null,"status":"..."}],"beats":[{"time":"HH:MM","reporter":"...","content":"..."}]}]}`;
+}
+
+function renderBeatsTableFromTimes(beats) {
+  const header = ` שעה   | גורם מדווח       | דיווח\n${'─'.repeat(80)}`;
+  const rows = beats.map(b => ` ${b.time||'--:--'} | ${String(b.reporter||'').padEnd(16,' ')} | ${b.content||''}`).join('\n');
+  return `${header}\n${rows}`;
+}
+
+// בונה את אובייקט הסיפור המלא ({text, zones, intro}) מתוך JSON שהוחזר מה-AI,
+// באמצעות אותם renderZoneBlock/renderFullStory של המחולל מבוסס-התבניות — כך שהפלט תמיד
+// באותו פורמט (רשימת אוכלוסייה לפי קומה/דירה, טבלת דיווחים) בלי קשר למקור הנתונים.
+function buildStoryFromAIJson(draft, ai) {
+  const { location, secondaryScenarios } = draft;
+  const intro = ai.intro || '';
+  const zones = [];
+  const summaryRows = [];
+  const zoneBlocks = [];
+  let totSerious = 0, totMod = 0, totLight = 0;
+
+  (ai.zones || []).forEach((z, idx) => {
+    const residents = (z.residents || []).map(r => ({
+      firstName: r.firstName || '—', lastName: r.lastName || '—',
+      age: Number(r.age) || 30, isMinor: Number(r.age) < 18,
+      floor: r.floor ?? null, apt: r.apt ?? null,
+      role: r.role || null, status: r.status || 'ידוע בטוח',
+    }));
+    const killedPeople   = residents.filter(r => r.status === 'הרוג');
+    const trappedPeople  = residents.filter(r => r.status === 'לכוד');
+    const injuredPeople  = residents.filter(r => (r.status||'').startsWith('פצוע'));
+    const serious = residents.filter(r => r.status === 'פצוע קשה').length;
+    const mod     = residents.filter(r => r.status === 'פצוע בינוני').length;
+    const light   = residents.filter(r => r.status === 'פצוע קל').length;
+    const resolvedMissing = residents.filter(r => r.status === 'אותר בטוח');
+    totSerious += serious; totMod += mod; totLight += light;
+
+    const roster = renderRoster(residents);
+    const beatLines = renderBeatsTableFromTimes(z.beats || []);
+    const popAtSite = residents.length;
+    const street = z.street || '—', houseNum = z.houseNum || 0;
+    const siteType = z.siteType || 'בניין מגורים';
+    const reportTime = z.reportTime || draft.startTime || '08:00';
+
+    zoneBlocks.push(renderZoneBlock(idx+1, location, street, houseNum, siteType, popAtSite, reportTime,
+      z.background || '', roster, beatLines, killedPeople.length, serious, mod, light, trappedPeople.length));
+
+    summaryRows.push({ z:idx+1, street, houseNum, reportTime, siteType, popAtSite, killed:killedPeople.length, injured:serious+mod+light, trapped:trappedPeople.length });
+
+    zones.push({
+      z:idx+1, street, houseNum, location, siteType, popAtSite, reportTime,
+      residents, killedPeople, trappedPeople, injuredPeople, missingPeople: resolvedMissing,
+      background: z.background || '', beats: z.beats || [],
+      finalKilled: killedPeople.length, serious, mod, light, trapped: trappedPeople.length,
+    });
+  });
+
+  const secText = secondaryScenarios.length
+    ? '\n\nאתגרים משניים:\n' + secondaryScenarios.map(s=>{
+        const obj = SEC_SCENARIOS.find(x=>x.id===s);
+        return `• ${obj?obj.name:s}`;
+      }).join('\n')
+    : '';
+
+  const text = renderFullStory(draft, intro, zoneBlocks, summaryRows, {serious:totSerious, mod:totMod, light:totLight}, secText);
+  return { text, zones, intro };
+}
+
 function generatePopulationStory(draft) {
   const {mainScenario, location, populationSize, complexity, durationHours, secondaryScenarios, startTime} = draft;
   const m = ({1:.5,2:1,3:2})[complexity]||1;
@@ -894,35 +987,10 @@ function generatePopulationStory(draft) {
       finalKilled, serious, mod, light, trapped,
     });
 
-    zonesSections += `
-═══════════════════════════════════════════
-זירה ${z} – ${location}, רחוב ${street} ${houseNum}
-═══════════════════════════════════════════
-מיקום: רחוב ${street} ${houseNum}
-שעת דיווח על נפילה: ${reportTime}
-סוג אתר: ${siteType}
-
-סיפור רקע:
-${bgByScenario(street, houseNum, siteType, popAtSite, floors)}
-
-רשימת אוכלוסייה
-${roster}
-סה"כ: ${popAtSite} אנשים באתר.
-
-דיווחים:
-${beatLines}
-
-סיכום נפגעים בזירה: ${finalKilled} הרוגים, ${serious+mod+light} פצועים בדרגות שונות (${serious} קשה / ${mod} בינוני / ${light} קל), ${trapped} לכודים שחולצו, 0 נעדרים.
-`;
+    zonesSections += renderZoneBlock(z, location, street, houseNum, siteType, popAtSite, reportTime,
+      bgByScenario(street, houseNum, siteType, popAtSite, floors), roster, beatLines,
+      finalKilled, serious, mod, light, trapped);
   }
-
-  const summaryHeader = `${'─'.repeat(80)}\n זירה        | מיקום                 | דיווח  | סוג אתר          | אוכ' | הרוגים | פצועים | לכודים\n${'─'.repeat(80)}`;
-  const summaryBody = summaryRows.map(r =>
-    ` זירה ${r.z}      | רח' ${r.street} ${r.houseNum}`.padEnd(24) +
-    `| ${r.reportTime}  | ${r.siteType.slice(0,16).padEnd(16)} | ${String(r.popAtSite).padEnd(4)} | ${String(r.killed).padEnd(6)} | ${String(r.injured).padEnd(6)} | ${r.trapped}`
-  ).join('\n');
-  const totKilledFinal = zones.reduce((s,z)=>s+z.killedPeople.length,0);
-  const summaryFooter = `${'─'.repeat(80)}\nסה"כ: ${totKilledFinal} הרוגים | ${totSerious+totMod+totLight} פצועים (${totSerious} קשים / ${totMod} בינוניים / ${totLight} קלים) | ${totTrapped} לכודים (חולצו) | 0 נעדרים`;
 
   const secText = secondaryScenarios.length
     ? '\n\nאתגרים משניים:\n' + secondaryScenarios.map(s=>{
@@ -931,27 +999,7 @@ ${beatLines}
       }).join('\n')
     : '';
 
-  const text = `══════════════════════════════════════════════
-סיפור כללי
-══════════════════════════════════════════════
-${intro}
-
-אוכלוסיית הרשות: ${populationSize.toLocaleString('he-IL')} תושבים
-כ-${Math.round(populationSize*0.15).toLocaleString('he-IL')} אוכלוסיות רגישות (קשישים, ילדים, אנשים עם מוגבלויות)
-
-מרכזי מידע ותמיכה שנפתחו:
-• מוקד 106 — ${pick(['בניין העירייה','מרכז קהילתי','אולם ספורט'])}
-• מרכז משפחות — סמוך לאתר, בניהול הרשות המקומית
-• ${Math.max(2,Math.round(populationSize/5000))} מרכזי כינוס ופינוי${secText}
-${zonesSections}
-══════════════════════════════════════════════
-טבלת סיכום זירות
-══════════════════════════════════════════════
-${summaryHeader}
-${summaryBody}
-${summaryFooter}
-
-משך התרגיל: ${durationHours} שעות | רמת מורכבות: ${{1:'קלה',2:'בינונית',3:'גבוהה'}[complexity]}`;
+  const text = renderFullStory(draft, intro, [zonesSections], summaryRows, {serious:totSerious, mod:totMod, light:totLight}, secText);
 
   return { text, zones, intro };
 }
@@ -2392,8 +2440,16 @@ Vue.createApp({
         if (useApi) {
           this.apiLoading = 'מייצר סיפור אוכלוסייה עם AI...';
           try {
-            this.draft.populationStory = await callAI(provider, apiKey, buildStoryPrompt(this.draft), 3000);
-          } catch {
+            const raw = await callAI(provider, apiKey, buildStoryJsonPrompt(this.draft), 8000);
+            const jsonStr = raw.replace(/```json\n?|\n?```/g, '').trim();
+            const parsed = JSON.parse(jsonStr);
+            const { text, zones, intro } = buildStoryFromAIJson(this.draft, parsed);
+            this.draft.populationStory = text;
+            this.draft.populationZones = zones;
+            this.draft.populationIntro = intro;
+            this.toast('סיפור אוכלוסייה נוצר בהצלחה עם AI', 'success');
+          } catch(e) {
+            this.toast(`שגיאת API בסיפור אוכלוסייה — עובר לתבניות: ${e.message}`, 'warning');
             const { text, zones, intro } = generatePopulationStory(this.draft);
             this.draft.populationStory = text;
             this.draft.populationZones = zones;
@@ -2445,6 +2501,7 @@ Vue.createApp({
       wsCtrl['!cols'] = [{wch:4},{wch:8},{wch:18},{wch:14},{wch:55},{wch:35},{wch:8}];
 
       const wb = XLSX.utils.book_new();
+      wb.Workbook = { Views: [{ RTL: true }] };
       XLSX.utils.book_append_sheet(wb, wsDrill, 'לוח הזרמות — תרגיל');
       XLSX.utils.book_append_sheet(wb, wsCtrl, 'לוח הזרמות — בקר');
       XLSX.writeFile(wb, `הזרמות_${ex.name||'תרגיל'}.xlsx`);
@@ -2488,7 +2545,7 @@ Vue.createApp({
       };
       const headerCell = (text, width) => cell(text, { bold:true, color:COL.white, fill:COL.primary, width, align:AlignmentType.RIGHT, size:20 });
       const row = cells => new TableRow({ children: cells });
-      const table = rows => new Table({ rows });
+      const table = rows => new Table({ rows, visuallyRightToLeft: true });
       const sectionHeading = text => new Paragraph({
         bidirectional: true, alignment: AlignmentType.RIGHT,
         shading: { type: ShadingType.CLEAR, color:'auto', fill: 'EFF6FF' },
