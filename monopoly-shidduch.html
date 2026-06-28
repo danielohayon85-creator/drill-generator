@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>מונופול — המהדורה לרווקים ולרווקות דתיים</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+:root{
+  --pink:#ffd6ea; --pink-d:#f4a6c8;
+  --blue:#cfe8ff; --blue-d:#9cc7ee;
+  --purple:#e6d8ff; --purple-d:#bfa3ec;
+  --orange:#ffe1c2; --orange-d:#f3b07d;
+  --gold:#fff0b3; --gold-d:#e8c860;
+  --station:#dfe9ea; --station-d:#a9c0c2;
+  --util:#fff3c4; --util-d:#e6c95c;
+  --chance:#ff8fb3; --community:#7fb8f0;
+  --corner:#fff7ea;
+  --board-bg:#eef8f1;
+  --ink:#3a2e3f; --ink-soft:#6b5b6e;
+  --shadow: 0 4px 14px rgba(80,40,70,.12);
+  --radius:14px;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; font-family:'Heebo','Segoe UI',sans-serif; direction:rtl;
+  background:linear-gradient(160deg,#fdf2f8,#eef8f1 55%,#fff7ea);
+  color:var(--ink); min-height:100vh; padding:20px;
+}
+.screen{max-width:1180px;margin:0 auto;}
+h1,h2,h3{margin:0;}
+.btn{
+  font-family:inherit; border:none; border-radius:10px; padding:10px 18px;
+  font-size:14px; font-weight:700; cursor:pointer; transition:transform .08s, box-shadow .12s;
+}
+.btn:hover{transform:translateY(-1px);}
+.btn:disabled{opacity:.45; cursor:not-allowed; transform:none;}
+.btn-main{background:linear-gradient(135deg,#ff8fb3,#ffb3c9); color:#fff; box-shadow:0 3px 10px rgba(255,100,150,.35);}
+.btn-soft{background:#fff; color:var(--ink); border:1.5px solid #e8d8e6;}
+.btn-blue{background:linear-gradient(135deg,#7fb8f0,#a9d4ff); color:#fff; box-shadow:0 3px 10px rgba(80,150,230,.3);}
+
+/* ===== Setup screen ===== */
+.title-block{text-align:center; margin-bottom:26px;}
+.game-title{font-size:46px; font-weight:900; letter-spacing:1px;
+  background:linear-gradient(135deg,#e85d8c,#7fb8f0); -webkit-background-clip:text; background-clip:text; color:transparent;}
+.game-sub{font-size:18px; font-weight:700; color:var(--ink-soft); margin-top:4px;}
+.game-slogan{font-size:13px; color:#a98; margin-top:6px; font-style:italic;}
+
+.setup-card{background:#fff; border-radius:20px; box-shadow:var(--shadow); padding:26px 28px; max-width:640px; margin:0 auto;}
+.setup-row{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+.player-line{display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap;}
+.player-line input[type=text]{flex:1; min-width:120px; padding:8px 10px; border-radius:8px; border:1.5px solid #e8d8e6; font-family:inherit; font-size:14px;}
+.token-pick{display:flex; gap:4px; flex-wrap:wrap;}
+.token-opt{width:34px; height:34px; border-radius:8px; border:2px solid #e8d8e6; background:#fbf6f9; font-size:17px;
+  display:flex; align-items:center; justify-content:center; cursor:pointer;}
+.token-opt.picked{border-color:#e85d8c; background:#ffe6ee;}
+.token-opt.taken{opacity:.25; cursor:not-allowed;}
+.count-btn{width:30px;height:30px;border-radius:8px;border:1.5px solid #e8d8e6;background:#fbf6f9;font-weight:800;cursor:pointer;font-size:16px;}
+.bills-legend{display:flex; gap:6px; flex-wrap:wrap; margin-top:16px; justify-content:center;}
+.bill-chip{padding:5px 10px; border-radius:6px; font-size:11px; font-weight:700; color:#5b4636; border:1px solid rgba(0,0,0,.08);}
+
+/* ===== Game screen ===== */
+.game-wrap{display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap;}
+.board-area{flex:0 0 auto;}
+.board{
+  width:min(760px,94vw); height:min(760px,94vw);
+  display:grid; grid-template-columns:repeat(11,1fr); grid-template-rows:repeat(11,1fr);
+  background:var(--board-bg); border-radius:18px; box-shadow:var(--shadow); padding:6px; gap:2px;
+}
+.cell{
+  position:relative; border-radius:6px; background:#fff; border:1px solid #e7eee8;
+  display:flex; flex-direction:column; justify-content:flex-end; overflow:hidden;
+  font-size:9px; padding:3px; line-height:1.15; cursor:default;
+}
+.cell .bar{height:9px; margin:-3px -3px 3px -3px; flex:0 0 auto;}
+.cell .nm{font-weight:700; font-size:8.6px; color:var(--ink);}
+.cell .pr{font-size:7.8px; color:#8a7a87; font-weight:600;}
+.cell.corner{display:flex; align-items:center; justify-content:center; text-align:center; background:var(--corner); font-size:10.5px; font-weight:800; padding:4px;}
+.cell.corner .nm{font-size:10.5px;}
+.cell.type-chance{background:#fff0f5;}
+.cell.type-community{background:#f0f7ff;}
+.cell.type-fee{background:#fbf4ea;}
+.cell.type-move{background:#f3f0fb;}
+.cell .owners{position:absolute; bottom:2px; left:2px; display:flex; gap:1px;}
+.cell .owners span{font-size:9px;}
+.cell .lvl{position:absolute; top:2px; left:2px; font-size:7px;}
+
+.center-area{
+  grid-row:2 / 11; grid-column:2 / 11; border-radius:12px; background:#fffefb;
+  border:2px dashed #e8d8c8; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:10px; padding:14px; text-align:center;
+}
+.center-area .ct-title{font-size:30px; font-weight:900; background:linear-gradient(135deg,#e85d8c,#7fb8f0); -webkit-background-clip:text;background-clip:text;color:transparent;}
+.center-area .ct-sub{font-size:12px; font-weight:700; color:var(--ink-soft);}
+.dice-row{display:flex; gap:10px; font-size:34px;}
+.turn-banner{font-size:14px; font-weight:800; padding:6px 14px; border-radius:20px; background:#ffe6ee;}
+.center-actions{display:flex; gap:8px; flex-wrap:wrap; justify-content:center;}
+
+.side-panel{flex:1; min-width:260px; display:flex; flex-direction:column; gap:12px;}
+.players-box{background:#fff; border-radius:16px; box-shadow:var(--shadow); padding:14px;}
+.player-card{display:flex; align-items:center; gap:8px; padding:8px; border-radius:10px; margin-bottom:6px; background:#fbf8fa;}
+.player-card.active{background:#ffe6ee; border:1.5px solid #f4a6c8;}
+.player-card.bankrupt{opacity:.4;}
+.player-card .ic{font-size:20px;}
+.player-card .nm{font-weight:700; font-size:13px;}
+.player-card .mn{font-size:12px; color:#a05; font-weight:800; margin-right:auto;}
+
+.log-box{background:#fff; border-radius:16px; box-shadow:var(--shadow); padding:12px 14px; height:170px; overflow-y:auto; font-size:12px;}
+.log-box div{padding:3px 0; border-bottom:1px dashed #eee;}
+
+/* ===== Modal ===== */
+.overlay{position:fixed; inset:0; background:rgba(40,20,35,.45); display:flex; align-items:center; justify-content:center; z-index:50; padding:16px;}
+.modal{background:#fff; border-radius:18px; padding:26px; max-width:420px; box-shadow:0 12px 40px rgba(0,0,0,.25); text-align:center;}
+.modal .mtag{display:inline-block; font-size:11px; font-weight:800; padding:3px 10px; border-radius:14px; margin-bottom:10px;}
+.modal h3{font-size:18px; margin-bottom:10px;}
+.modal p{font-size:14px; color:var(--ink-soft); margin-bottom:18px; line-height:1.5;}
+.modal .mbtns{display:flex; gap:8px; justify-content:center; flex-wrap:wrap;}
+.tag-chance{background:#ffe1ec; color:#c23566;}
+.tag-community{background:#dceeff; color:#1f6fb8;}
+
+.upgrade-row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid #f0e8ee; font-size:12.5px;}
+.hidden{display:none !important;}
+.help-text{font-size:12.5px; line-height:1.7; text-align:right; max-height:50vh; overflow-y:auto;}
+.help-text b{color:#c23566;}
+</style>
+</head>
+<body>
+<div class="screen">
+
+  <!-- ===== Setup screen ===== -->
+  <div id="setup-screen">
+    <div class="title-block">
+      <div class="game-title">מונופול</div>
+      <div class="game-sub">המהדורה לרווקים ולרווקות דתיים</div>
+      <div class="game-slogan">"הדרך לחופה מלאה הפתעות"</div>
+    </div>
+
+    <div class="setup-card">
+      <h3 style="margin-bottom:12px;">הגדרת שחקנים</h3>
+      <div id="player-rows"></div>
+      <div class="setup-row">
+        <div>
+          <button class="count-btn" id="minus-player">−</button>
+          <span id="player-count-label" style="margin:0 8px;font-weight:700;">2 שחקנים</span>
+          <button class="count-btn" id="plus-player">+</button>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:18px;">
+        <button class="btn btn-main" id="start-game-btn" style="font-size:16px; padding:12px 30px;">💍 צאו לדרך — 1,500 לבבות לכל שחקן</button>
+      </div>
+
+      <div class="bills-legend">
+        <span class="bill-chip" style="background:#fde2e2">1 לב</span>
+        <span class="bill-chip" style="background:#fde9c8">5 לבבות</span>
+        <span class="bill-chip" style="background:#fff6c8">10 לבבות</span>
+        <span class="bill-chip" style="background:#d9f5d6">20 לבבות</span>
+        <span class="bill-chip" style="background:#cfe8ff">50 לבבות</span>
+        <span class="bill-chip" style="background:#e6d8ff">100 לבבות</span>
+        <span class="bill-chip" style="background:#ffd6ea">500 לבבות</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Game screen ===== -->
+  <div id="game-screen" class="hidden">
+    <div class="game-wrap">
+      <div class="board-area">
+        <div class="board" id="board"></div>
+      </div>
+      <div class="side-panel">
+        <div class="players-box" id="players-box"></div>
+        <div class="center-actions" style="justify-content:flex-start;">
+          <button class="btn btn-soft" id="manage-btn">🏠 ניהול נכסים</button>
+          <button class="btn btn-soft" id="help-btn">📜 חוקי המשחק</button>
+        </div>
+        <div class="log-box" id="log-box"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="overlay">
+    <div class="modal" id="modal"></div>
+  </div>
+
+</div>
+
+<script>
+/* ===================== DATA ===================== */
+const TOKENS = [
+  {name:'כוס קפה', icon:'☕'}, {name:'טלפון', icon:'📱'}, {name:'טבעת', icon:'💍'}, {name:'סידור', icon:'📖'},
+  {name:'רכב', icon:'🚗'}, {name:'כיפה', icon:'🧢'}, {name:'לב', icon:'❤️'}, {name:'סיכת שדכן', icon:'📌'}
+];
+
+const LEVEL_MULT = [1,3,6,10,15,25];
+const STATION_RENT = [0,25,50,100,200];
+
+function prop(id,name,price,rentBase,group){ return {id,name,type:'property',price,rentBase,group,owner:null,level:0}; }
+function station(id,name){ return {id,name,type:'station',price:200,owner:null}; }
+function utility(id,name){ return {id,name,type:'utility',price:150,owner:null}; }
+function fee(id,name,amount){ return {id,name,type:'fee',amount}; }
+function move(id,name,amount){ return {id,name,type:'move',amount}; }
+function loseturn(id,name){ return {id,name,type:'loseturn'}; }
+function rollagain(id,name){ return {id,name,type:'rollagain'}; }
+function chanceCell(id,name){ return {id,name,type:'chance'}; }
+function communityCell(id,name){ return {id,name,type:'community'}; }
+function corner(id,name,sub,kind){ return {id,name,sub,type:'corner-'+kind}; }
+
+const BOARD = [
+  corner(0,'התחלה','קיבלת הצעת שידוך! אסוף 200 לבבות','start'),
+  prop(1,'דייט ראשון',60,10,'pink'),
+  communityCell(2,'שיחה מאמא'),
+  prop(3,'דייט שני',80,14,'pink'),
+  fee(4,'קפה ראשון',60),
+  station(5,'תחנה: בית קפה'),
+  prop(6,'דייט שלישי',100,18,'blue'),
+  chanceCell(7,'שדכנית מתעוררת אחרי שנה'),
+  prop(8,'דייט רביעי',120,22,'blue'),
+  fee(9,'חניה במרכז העיר',70),
+  corner(10,'משבר קטן בדרך לדייט','הפסד תור','lose'),
+  prop(11,'דייט חמישי',150,26,'purple'),
+  utility(12,'שירות: שדכנית'),
+  prop(13,'דייט מתקדם',180,30,'purple'),
+  fee(14,'מנוי לאפליקציה',80),
+  station(15,'תחנה: גלידריה'),
+  communityCell(16,'קופת הקהילה'),
+  prop(17,'פגישה עם ההורים',220,36,'orange'),
+  loseturn(18,'שבת אצל הדודה'),
+  prop(19,'שבת אצל המשפחה',260,42,'orange'),
+  corner(20,'אירוסין 💍','ניצחת במשחק!','win'),
+  fee(21,'דייט במסעדה',180),
+  prop(22,'שיחת יחסינו לאן',300,50,'gold'),
+  chanceCell(23,'קלף הפתעה'),
+  prop(24,'פגישה עם השדכנית',350,60,'gold'),
+  station(25,'תחנה: מסעדה'),
+  fee(26,'בר מצווה של אחיין',150),
+  utility(27,'שירות: קבוצת שידוכים'),
+  fee(28,'נסיעה לירושלים',100),
+  move(29,'היא רוצה מעל 1.85',-2),
+  corner(30,'חשבנו עליך כמו אח/אחות','חזור להתחלה','gotostart'),
+  move(31,'הוא עדיין לא סגור על עצמו',-2),
+  move(32,'לא הרגשתי את זה',-3),
+  communityCell(33,'קופת הקהילה'),
+  move(34,'יש כימיה',2),
+  station(35,'תחנה: נסיעה לירושלים'),
+  rollagain(36,'תקווה מחודשת'),
+  loseturn(37,'שאלה קבוצתית: "נו, יש משהו?"'),
+  fee(38,'חתונה של חבר',400),
+  chanceCell(39,'קלף הפתעה'),
+];
+
+const CHANCE_CARDS = [
+  {text:'אמא שלחה עוד הצעה. התקדם שלוש משבצות.', action:{type:'move',amount:3}},
+  {text:'היא ביטלה שעה לפני. שלם 100 לבבות.', action:{type:'pay',amount:100}},
+  {text:'הוא כתב "זורם" ולא התקדם. הפסד תור.', action:{type:'loseturn'}},
+  {text:'קיבלת "יש כימיה". התקדם לדייט הבא.', action:{type:'advance'}},
+  {text:'היא רוצה רק מעל 1.85. חזור שתי משבצות.', action:{type:'move',amount:-2}},
+  {text:'הוא רוצה מישהי "קלילה אבל רצינית". חזור משבצת.', action:{type:'move',amount:-1}},
+  {text:'השדכנית נעלמה. הפסד תור.', action:{type:'loseturn'}},
+  {text:'השדכנית חזרה עם הצעה. קח 100 לבבות.', action:{type:'collect',amount:100}},
+  {text:'הדייט היה טוב. גלגל שוב.', action:{type:'rollagain'}},
+  {text:'"אתה מקסים אבל..." חזור להתחלה.', action:{type:'gotostart'}},
+  {text:'קיבלת הודעה אחרי שבועיים. קח קלף נוסף.', action:{type:'drawagain'}},
+  {text:'ההורים אהבו. התקדם שתי משבצות.', action:{type:'move',amount:2}},
+];
+
+const COMMUNITY_CARDS = [
+  {text:'שבת אצל ההורים. כל הדודים שאלו מה קורה. הפסד תור.', action:{type:'loseturn'}},
+  {text:'השתתפת בעוד חתונה. שלם 300 לבבות.', action:{type:'pay',amount:300}},
+  {text:'חבר מהישיבה כבר עם חמישה ילדים. חזור שתי משבצות.', action:{type:'move',amount:-2}},
+  {text:'מישהו אמר "זה יגיע בזמנו". קבל 50 לבבות.', action:{type:'collect',amount:50}},
+  {text:'נסעת לשבת היכרות. שלם 150 לבבות.', action:{type:'pay',amount:150}},
+  {text:'פתחת מנוי באתר היכרויות. שלם 80 לבבות.', action:{type:'pay',amount:80}},
+  {text:'קיבלת ברכה מרב. התקדם משבצת.', action:{type:'move',amount:1}},
+  {text:'חברה של אחותך חשבה על מישהי. קח קלף הפתעה.', action:{type:'drawother',deck:'chance'}},
+  {text:'"למה אתה כל כך בררן?" הפסד תור.', action:{type:'loseturn'}},
+  {text:'"דווקא יש לי מישהי בשבילך". גלגל שוב.', action:{type:'rollagain'}},
+  {text:'שיחת טלפון טובה. התקדם שתי משבצות.', action:{type:'move',amount:2}},
+  {text:'קיבלת הזמנה לעוד חתונה. שלם 250 לבבות.', action:{type:'pay',amount:250}},
+];
+
+const GROUP_COLORS = {pink:'var(--pink)',blue:'var(--blue)',purple:'var(--purple)',orange:'var(--orange)',gold:'var(--gold)'};
+const GROUP_COLORS_D = {pink:'var(--pink-d)',blue:'var(--blue-d)',purple:'var(--purple-d)',orange:'var(--orange-d)',gold:'var(--gold-d)'};
+const GROUP_NAMES = {pink:'ורוד',blue:'תכלת',purple:'סגול',orange:'כתום',gold:'זהב (מסלול הנישואין)'};
+
+/* ===================== STATE ===================== */
+let players = [];
+let current = 0;
+let chanceDeck = [], communityDeck = [];
+let dice = [1,1];
+let extraRoll = false;
+let gameOver = false;
+
+function shuffle(arr){ const a=[...arr]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function freshDeck(cards){ return shuffle(cards.map((c,i)=>i)); }
+
+/* ===================== SETUP SCREEN ===================== */
+let playerCount = 2;
+function renderSetupRows(){
+  const wrap = document.getElementById('player-rows');
+  wrap.innerHTML = '';
+  for(let i=0;i<playerCount;i++){
+    const row = document.createElement('div');
+    row.className = 'player-line';
+    const tokenButtons = TOKENS.map((t,ti)=>`<div class="token-opt" data-pi="${i}" data-ti="${ti}">${t.icon}</div>`).join('');
+    row.innerHTML = `<input type="text" id="name-${i}" placeholder="שם שחקן ${i+1}" value="שחקן ${i+1}"><div class="token-pick">${tokenButtons}</div>`;
+    wrap.appendChild(row);
+  }
+  if(!window._tokenPicks) window._tokenPicks = {};
+  for(let i=0;i<playerCount;i++){ if(window._tokenPicks[i]===undefined) window._tokenPicks[i]=i%TOKENS.length; }
+  refreshTokenButtons();
+}
+function refreshTokenButtons(){
+  document.querySelectorAll('.token-opt').forEach(btn=>{
+    const pi=+btn.dataset.pi, ti=+btn.dataset.ti;
+    btn.classList.remove('picked','taken');
+    if(window._tokenPicks[pi]===ti) btn.classList.add('picked');
+    else if(Object.values(window._tokenPicks).includes(ti)) btn.classList.add('taken');
+    btn.onclick = ()=>{
+      if(Object.values(window._tokenPicks).includes(ti)) return;
+      window._tokenPicks[pi]=ti; refreshTokenButtons();
+    };
+  });
+}
+document.getElementById('plus-player').onclick = ()=>{ if(playerCount<6){playerCount++; updateCountLabel(); renderSetupRows();} };
+document.getElementById('minus-player').onclick = ()=>{ if(playerCount>2){playerCount--; updateCountLabel(); renderSetupRows();} };
+function updateCountLabel(){ document.getElementById('player-count-label').textContent = playerCount+' שחקנים'; }
+renderSetupRows();
+
+document.getElementById('start-game-btn').onclick = ()=>{
+  players = [];
+  for(let i=0;i<playerCount;i++){
+    const name = document.getElementById('name-'+i).value.trim() || ('שחקן '+(i+1));
+    const tok = TOKENS[window._tokenPicks[i]];
+    players.push({name, icon:tok.icon, pos:0, money:1500, skipNext:false, bankrupt:false});
+  }
+  chanceDeck = freshDeck(CHANCE_CARDS);
+  communityDeck = freshDeck(COMMUNITY_CARDS);
+  current = 0;
+  document.getElementById('setup-screen').classList.add('hidden');
+  document.getElementById('game-screen').classList.remove('hidden');
+  buildBoardDOM();
+  renderAll();
+  log('🎉 המשחק מתחיל! בהצלחה בדרך לחופה.');
+};
+
+/* ===================== BOARD RENDER ===================== */
+function cellGridPos(i){
+  if(i<=10) return {row:11, col:11-i};
+  if(i<=20) return {row:11-(i-10), col:1};
+  if(i<=30) return {row:1, col:1+(i-20)};
+  return {row:1+(i-30), col:11};
+}
+function cellTypeColor(cell){
+  if(cell.type==='property') return GROUP_COLORS[cell.group];
+  if(cell.type==='station') return 'var(--station)';
+  if(cell.type==='utility') return 'var(--util)';
+  if(cell.type==='chance') return 'var(--chance)';
+  if(cell.type==='community') return 'var(--community)';
+  return '#fff';
+}
+function buildBoardDOM(){
+  const board = document.getElementById('board');
+  board.innerHTML = '';
+  const center = document.createElement('div');
+  center.className = 'center-area';
+  center.innerHTML = `
+    <div class="ct-title">מונופול</div>
+    <div class="ct-sub">המהדורה לרווקים ולרווקות דתיים</div>
+    <div class="turn-banner" id="turn-banner"></div>
+    <div class="dice-row" id="dice-row">⚀ ⚀</div>
+    <div class="center-actions">
+      <button class="btn btn-main" id="roll-btn">🎲 הטל קוביות</button>
+      <button class="btn btn-blue hidden" id="end-turn-btn">➡ סיים תור</button>
+    </div>
+  `;
+  board.appendChild(center);
+
+  BOARD.forEach(cell=>{
+    const {row,col} = cellGridPos(cell.id);
+    const div = document.createElement('div');
+    div.id = 'cell-'+cell.id;
+    div.style.gridRow = row; div.style.gridColumn = col;
+    if(cell.type.startsWith('corner')){
+      div.className = 'cell corner';
+      div.innerHTML = `<div class="nm">${cell.name}</div><div class="pr">${cell.sub}</div><div class="owners"></div>`;
+    } else {
+      div.className = 'cell type-'+cell.type;
+      const bar = (cell.type==='property'||cell.type==='station'||cell.type==='utility'||cell.type==='chance'||cell.type==='community')
+        ? `<div class="bar" style="background:${cellTypeColor(cell)}"></div>` : '';
+      let priceLine = '';
+      if(cell.type==='property') priceLine = cell.price+' ❤';
+      else if(cell.type==='station'||cell.type==='utility') priceLine = cell.price+' ❤';
+      else if(cell.type==='fee') priceLine = '−'+cell.amount+' ❤';
+      else if(cell.type==='move') priceLine = (cell.amount>0?'+':'')+cell.amount+' משבצות';
+      div.innerHTML = `${bar}<div class="lvl" id="lvl-${cell.id}"></div><div class="nm">${cell.name}</div><div class="pr">${priceLine}</div><div class="owners" id="owners-${cell.id}"></div>`;
+    }
+    board.appendChild(div);
+  });
+
+  document.getElementById('roll-btn').onclick = onRoll;
+  document.getElementById('end-turn-btn').onclick = ()=>{ nextPlayer(); renderAll(); };
+}
+
+function renderAll(){
+  renderPlayersBox();
+  renderOwners();
+  renderTurnBanner();
+}
+function renderTurnBanner(){
+  const banner = document.getElementById('turn-banner');
+  if(gameOver) return;
+  const p = players[current];
+  banner.textContent = `תור ${p.icon} ${p.name}`;
+  document.getElementById('dice-row').textContent = diceFace(dice[0])+' '+diceFace(dice[1]);
+}
+function diceFace(n){ return ['','⚀','⚁','⚂','⚃','⚄','⚅'][n]; }
+
+function renderPlayersBox(){
+  const box = document.getElementById('players-box');
+  box.innerHTML = '<h3 style="margin-bottom:8px;font-size:14px;">שחקנים</h3>';
+  players.forEach((p,i)=>{
+    const row = document.createElement('div');
+    row.className = 'player-card'+(i===current && !p.bankrupt?' active':'')+(p.bankrupt?' bankrupt':'');
+    row.innerHTML = `<span class="ic">${p.icon}</span><span class="nm">${p.name}${p.bankrupt?' (פשט רגל)':''}</span><span class="mn">${p.money} ❤</span>`;
+    box.appendChild(row);
+  });
+}
+function renderOwners(){
+  BOARD.forEach(cell=>{
+    if(cell.type==='property'||cell.type==='station'||cell.type==='utility'){
+      const el = document.getElementById('owners-'+cell.id);
+      if(el) el.innerHTML = cell.owner!=null ? `<span>${players[cell.owner].icon}</span>` : '';
+      const lvlEl = document.getElementById('lvl-'+cell.id);
+      if(lvlEl && cell.type==='property') lvlEl.textContent = cell.level===5?'💍':(cell.level>0?'❤'.repeat(cell.level):'');
+    }
+  });
+  // tokens on cells (place each player's icon near their position on top of the corner/normal cell)
+  document.querySelectorAll('.token-on-cell').forEach(e=>e.remove());
+  players.forEach((p,i)=>{
+    if(p.bankrupt) return;
+    const cellEl = document.getElementById('cell-'+p.pos);
+    if(!cellEl) return;
+    const tok = document.createElement('span');
+    tok.className = 'token-on-cell';
+    tok.style.position='absolute'; tok.style.fontSize='11px';
+    tok.style.top=(2+i*11)+'px'; tok.style.right='2px';
+    tok.textContent = p.icon;
+    cellEl.appendChild(tok);
+  });
+}
+
+function log(msg){
+  const box = document.getElementById('log-box');
+  const d = document.createElement('div');
+  d.textContent = msg;
+  box.prepend(d);
+}
+
+/* ===================== MODAL ===================== */
+function showModal(opts){
+  return new Promise(resolve=>{
+    const overlay = document.getElementById('overlay');
+    const modal = document.getElementById('modal');
+    modal.innerHTML = `
+      ${opts.tag?`<span class="mtag ${opts.tagClass||''}">${opts.tag}</span>`:''}
+      <h3>${opts.title||''}</h3>
+      <div class="${opts.htmlBody?'help-text':''}" style="${opts.htmlBody?'':'font-size:14px;color:#6b5b6e;margin-bottom:18px;line-height:1.5;'}">${opts.body||''}</div>
+      <div class="mbtns" id="modal-btns"></div>
+    `;
+    const btnsWrap = document.getElementById('modal-btns');
+    (opts.buttons||[{label:'אישור', cls:'btn-main', value:true}]).forEach(b=>{
+      const btn = document.createElement('button');
+      btn.className = 'btn '+(b.cls||'btn-soft');
+      btn.textContent = b.label;
+      btn.onclick = ()=>{ overlay.classList.add('hidden'); resolve(b.value); };
+      btnsWrap.appendChild(btn);
+    });
+    overlay.classList.remove('hidden');
+  });
+}
+
+/* ===================== GAME LOGIC ===================== */
+async function onRoll(){
+  if(gameOver) return;
+  const p = players[current];
+  document.getElementById('roll-btn').disabled = true;
+
+  if(p.skipNext){
+    p.skipNext = false;
+    await showModal({title:'הפסד תור 😔', body:`${p.name} מפסיד/ה את התור הזה.`, tag:'סטטוס'});
+    document.getElementById('roll-btn').disabled = false;
+    nextPlayer(); renderAll();
+    return;
+  }
+
+  dice = [1+Math.floor(Math.random()*6), 1+Math.floor(Math.random()*6)];
+  const sum = dice[0]+dice[1];
+  renderTurnBanner();
+  log(`${p.icon} ${p.name} הטיל/ה ${dice[0]}+${dice[1]} = ${sum}`);
+
+  await movePlayerBy(p, sum, 0);
+  renderAll();
+
+  if(!gameOver){
+    if(extraRoll){
+      extraRoll = false;
+      log(`${p.name} מקבל/ת הטלה נוספת!`);
+      document.getElementById('roll-btn').disabled = false;
+    } else {
+      nextPlayer();
+      renderAll();
+      document.getElementById('roll-btn').disabled = false;
+    }
+  }
+}
+
+function nextPlayer(){
+  if(gameOver) return;
+  const active = players.filter(p=>!p.bankrupt);
+  if(active.length<=1){ return; }
+  do{
+    current = (current+1)%players.length;
+  } while(players[current].bankrupt);
+}
+
+async function movePlayerBy(player, steps, depth){
+  if(depth>6) return;
+  const old = player.pos;
+  let raw = old + steps;
+  let bonus = false;
+  if(steps>0 && raw>=40){ bonus = true; }
+  let np = ((raw%40)+40)%40;
+  player.pos = np;
+  if(bonus){ player.money += 200; log(`${player.name} עבר/ה בהתחלה — קיבל/ה 200 לבבות!`); }
+  renderAll();
+  await handleLanding(player, np, depth);
+}
+
+function teleport(player, pos){ player.pos = pos; }
+
+async function handleLanding(player, pos, depth){
+  if(player.bankrupt || gameOver) return;
+  const cell = BOARD[pos];
+  switch(cell.type){
+    case 'corner-start':
+      log(`${player.name} בהתחלה.`);
+      break;
+    case 'corner-lose':
+      player.skipNext = true;
+      await showModal({title:cell.name, body:cell.sub, tag:'משבצת מיוחדת'});
+      log(`${player.name} נחת/ה ב"${cell.name}" — יפסיד/תפסיד את התור הבא.`);
+      break;
+    case 'corner-win':
+      await triggerWin(player);
+      break;
+    case 'corner-gotostart':
+      await showModal({title:cell.name, body:cell.sub, tag:'משבצת מיוחדת'});
+      teleport(player, 0);
+      log(`${player.name} נחת/ה ב"${cell.name}" וחזר/ה להתחלה.`);
+      renderAll();
+      await handleLanding(player, 0, depth+1);
+      break;
+    case 'property':
+      await handlePropertyLanding(player, cell);
+      break;
+    case 'station':
+      await handleStationLanding(player, cell);
+      break;
+    case 'utility':
+      await handleUtilityLanding(player, cell);
+      break;
+    case 'fee':
+      await showModal({title:cell.name, body:`שלם ${cell.amount} לבבות.`, tag:'תשלום', tagClass:'tag-chance'});
+      payBank(player, cell.amount);
+      log(`${player.name} שילם/ה ${cell.amount} לבבות (${cell.name}).`);
+      break;
+    case 'move':
+      await showModal({title:cell.name, body:`${cell.amount>0?'התקדם':'חזור'} ${Math.abs(cell.amount)} משבצות.`, tag:'משבצת מיוחדת'});
+      await movePlayerBy(player, cell.amount, depth+1);
+      break;
+    case 'loseturn':
+      player.skipNext = true;
+      await showModal({title:cell.name, body:'הפסד תור.', tag:'משבצת מיוחדת'});
+      log(`${player.name} נחת/ה ב"${cell.name}" — יפסיד/תפסיד תור.`);
+      break;
+    case 'rollagain':
+      extraRoll = true;
+      await showModal({title:cell.name, body:'גלגל/י שוב!', tag:'משבצת מיוחדת'});
+      log(`${player.name} נחת/ה ב"${cell.name}" — מקבל/ת הטלה נוספת.`);
+      break;
+    case 'chance':
+      await drawAndApply('chance', player, depth);
+      break;
+    case 'community':
+      await drawAndApply('community', player, depth);
+      break;
+  }
+}
+
+async function handlePropertyLanding(player, cell){
+  if(cell.owner===null){
+    if(player.money>=cell.price){
+      const buy = await showModal({
+        title:cell.name, body:`לקנות את "${cell.name}" עבור ${cell.price} לבבות?`, tag:'נכס פנוי',
+        buttons:[{label:'💍 קונה',cls:'btn-main',value:true},{label:'לא תודה',cls:'btn-soft',value:false}]
+      });
+      if(buy){ cell.owner = players.indexOf(player); player.money -= cell.price; log(`${player.name} רכש/ה את "${cell.name}" עבור ${cell.price} לבבות.`); }
+    } else {
+      log(`${player.name} לא יכול/ה להרשות לעצמו/ה את "${cell.name}".`);
+    }
+  } else if(cell.owner !== players.indexOf(player)){
+    const owner = players[cell.owner];
+    const rent = cell.rentBase * LEVEL_MULT[cell.level];
+    await showModal({title:cell.name, body:`הנכס שייך ל-${owner.name}. שלם/י ${rent} לבבות.`, tag:'דמי שכירות', tagClass:'tag-chance'});
+    payToPlayer(player, owner, rent);
+    log(`${player.name} שילם/ה ${rent} לבבות שכירות ל${owner.name} (${cell.name}).`);
+  }
+}
+
+async function handleStationLanding(player, cell){
+  if(cell.owner===null){
+    if(player.money>=cell.price){
+      const buy = await showModal({title:cell.name, body:`לקנות עבור ${cell.price} לבבות?`, tag:'תחנה פנויה',
+        buttons:[{label:'🚗 קונה',cls:'btn-main',value:true},{label:'לא תודה',cls:'btn-soft',value:false}]});
+      if(buy){ cell.owner = players.indexOf(player); player.money -= cell.price; log(`${player.name} רכש/ה את "${cell.name}".`); }
+    }
+  } else if(cell.owner !== players.indexOf(player)){
+    const owner = players[cell.owner];
+    const count = BOARD.filter(c=>c.type==='station' && c.owner===cell.owner).length;
+    const rent = STATION_RENT[count];
+    await showModal({title:cell.name, body:`התחנה שייכת ל-${owner.name}. שלם/י ${rent} לבבות.`, tag:'דמי שכירות', tagClass:'tag-chance'});
+    payToPlayer(player, owner, rent);
+    log(`${player.name} שילם/ה ${rent} לבבות (${cell.name}).`);
+  }
+}
+
+async function handleUtilityLanding(player, cell){
+  if(cell.owner===null){
+    if(player.money>=cell.price){
+      const buy = await showModal({title:cell.name, body:`לקנות עבור ${cell.price} לבבות?`, tag:'שירות פנוי',
+        buttons:[{label:'☎ קונה',cls:'btn-main',value:true},{label:'לא תודה',cls:'btn-soft',value:false}]});
+      if(buy){ cell.owner = players.indexOf(player); player.money -= cell.price; log(`${player.name} רכש/ה את "${cell.name}".`); }
+    }
+  } else if(cell.owner !== players.indexOf(player)){
+    const owner = players[cell.owner];
+    const count = BOARD.filter(c=>c.type==='utility' && c.owner===cell.owner).length;
+    const rent = (dice[0]+dice[1]) * (count===1?4:10);
+    await showModal({title:cell.name, body:`השירות שייך ל-${owner.name}. שלם/י ${rent} לבבות.`, tag:'דמי שכירות', tagClass:'tag-chance'});
+    payToPlayer(player, owner, rent);
+    log(`${player.name} שילם/ה ${rent} לבבות (${cell.name}).`);
+  }
+}
+
+async function drawAndApply(deckName, player, depth){
+  const deckArr = deckName==='chance' ? CHANCE_CARDS : COMMUNITY_CARDS;
+  let deck = deckName==='chance' ? chanceDeck : communityDeck;
+  if(deck.length===0) deck = freshDeck(deckArr);
+  const idx = deck.shift();
+  if(deckName==='chance') chanceDeck = deck; else communityDeck = deck;
+  const card = deckArr[idx];
+
+  await showModal({
+    title: deckName==='chance' ? '🎀 קלף הפתעה' : '📦 קלף קופת הקהילה',
+    body: card.text,
+    tag: deckName==='chance' ? 'הפתעה' : 'קופת הקהילה',
+    tagClass: deckName==='chance' ? 'tag-chance' : 'tag-community'
+  });
+  log(`${player.name} שלף/ה: "${card.text}"`);
+
+  const a = card.action;
+  switch(a.type){
+    case 'move':
+      await movePlayerBy(player, a.amount, (depth||0)+1);
+      break;
+    case 'pay':
+      payBank(player, a.amount);
+      break;
+    case 'collect':
+      player.money += a.amount;
+      break;
+    case 'loseturn':
+      player.skipNext = true;
+      break;
+    case 'rollagain':
+      extraRoll = true;
+      break;
+    case 'gotostart':
+      teleport(player, 0);
+      renderAll();
+      await handleLanding(player, 0, (depth||0)+1);
+      break;
+    case 'advance':
+      {
+        let steps = 1;
+        let p2 = (player.pos+1)%40;
+        while(BOARD[p2].type!=='property' && steps<40){ p2=(p2+1)%40; steps++; }
+        await movePlayerBy(player, steps, (depth||0)+1);
+      }
+      break;
+    case 'drawagain':
+      if((depth||0)<4) await drawAndApply(deckName, player, (depth||0)+1);
+      break;
+    case 'drawother':
+      if((depth||0)<4) await drawAndApply(a.deck, player, (depth||0)+1);
+      break;
+  }
+  renderAll();
+}
+
+function payBank(player, amount){
+  player.money -= amount;
+  checkBankrupt(player);
+}
+function payToPlayer(payer, payee, amount){
+  payer.money -= amount;
+  payee.money += amount;
+  checkBankrupt(payer);
+}
+function checkBankrupt(player){
+  if(player.money < 0 && !player.bankrupt){
+    player.bankrupt = true;
+    BOARD.forEach(c=>{
+      if((c.type==='property'||c.type==='station'||c.type==='utility') && c.owner===players.indexOf(player)){
+        c.owner = null; if(c.level!==undefined) c.level=0;
+      }
+    });
+    log(`💔 ${player.name} פשט/ה רגל ויוצא/ת מהמשחק!`);
+    const active = players.filter(p=>!p.bankrupt);
+    if(active.length===1){
+      gameOver = true;
+      setTimeout(()=>showModal({title:'🏆 ניצחון!', body:`${active[0].name} הוא/היא הזוכה האחרון/ה במשחק!`, tag:'סוף המשחק'}),100);
+    } else if(current===players.indexOf(player)){
+      nextPlayer();
+    }
+  }
+}
+
+async function triggerWin(player){
+  gameOver = true;
+  await showModal({title:'🏆 מזל טוב! 💍', body:`${player.icon} ${player.name} הגיע/ה לחופה לפני כולם — ניצחת במשחק!`, tag:'אירוסין', tagClass:'tag-chance'});
+  log(`🎊 ${player.name} ניצח/ה במשחק והגיע/ה לחופה!`);
+}
+
+/* ===================== MANAGE PROPERTIES ===================== */
+document.getElementById('manage-btn').onclick = async ()=>{
+  const player = players[current];
+  const groups = {};
+  BOARD.filter(c=>c.type==='property').forEach(c=>{ (groups[c.group]=groups[c.group]||[]).push(c); });
+  let html = '';
+  Object.keys(groups).forEach(g=>{
+    const cells = groups[g];
+    const ownsAll = cells.every(c=>c.owner===players.indexOf(player));
+    html += `<div style="margin-bottom:6px;font-weight:700;font-size:12.5px;color:#a05a78;">${GROUP_NAMES[g]}</div>`;
+    cells.forEach(c=>{
+      const cost = Math.round(c.price*0.5);
+      const can = ownsAll && c.level<5 && player.money>=cost;
+      html += `<div class="upgrade-row"><span>${c.name} — רמה ${c.level===5?'💍 הצעת נישואין':c.level}</span>
+        <button class="btn btn-soft" style="padding:5px 10px;font-size:11px;" data-up="${c.id}" ${can?'':'disabled'}>שדרג (${cost} ❤)</button></div>`;
+    });
+  });
+  await showModal({
+    title:'🏠 ניהול נכסים — '+player.name,
+    body: html || '<i>אין נכסים</i>',
+    htmlBody:true,
+    tag:'דייטים נוספים = בתים · הצעת נישואין = מלון',
+    buttons:[{label:'סגור', cls:'btn-soft', value:true}]
+  });
+  document.querySelectorAll('[data-up]').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      const id = +btn.dataset.up;
+      const cell = BOARD[id];
+      const cost = Math.round(cell.price*0.5);
+      if(player.money>=cost && cell.level<5){
+        player.money -= cost; cell.level++;
+        log(`${player.name} שדרג/ה את "${cell.name}" ל${cell.level===5?'הצעת נישואין 💍':'רמה '+cell.level}.`);
+        document.getElementById('overlay').classList.add('hidden');
+        renderAll();
+      }
+    };
+  });
+};
+
+/* ===================== HELP ===================== */
+document.getElementById('help-btn').onclick = ()=>{
+  showModal({
+    title:'📜 חוקי המשחק',
+    htmlBody:true,
+    body:`
+      <b>מטרת המשחק:</b> להגיע ל"אירוסין" (משבצת 20) לפני שנגמרים הכסף, הסבלנות והכוחות.<br>
+      <b>מטבע:</b> לבבות ❤. כל שחקן מתחיל עם 1,500 לבבות.<br>
+      <b>מעבר בהתחלה:</b> קבלת 200 לבבות.<br>
+      <b>נכסי דייטים:</b> ניתן לקנות, לגבות שכירות, ולשדרג — "עוד דייט" (כמו בית) עד 4 רמות, ואז "הצעת נישואין" (כמו מלון) לרמה הגבוהה ביותר. יש לשלוט בכל קבוצת הצבע כדי לשדרג.<br>
+      <b>תחנות ושירותים:</b> נקנים בנפרד; שכר הדירה עולה לפי כמות התחנות/שירותים שבבעלותך.<br>
+      <b>קלפי הפתעה (ורוד) וקופת הקהילה (כחול):</b> נשלפים אוטומטית בנחיתה על המשבצת המתאימה.<br>
+      <b>פשיטת רגל:</b> שחקן שכספו יורד מתחת ל-0 פושט רגל ויוצא מהמשחק; נכסיו חוזרים לבנק.<br>
+      <b>קלף יציאה מהמשבר:</b> "היא/הוא הסכים/ה לעוד פגישה" — קלף נדיר ברוח המשחק (פלאוור־טקסט).
+    `,
+    buttons:[{label:'הבנתי, בהצלחה!', cls:'btn-main', value:true}]
+  });
+};
+</script>
+</body>
+</html>
