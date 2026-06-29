@@ -1313,7 +1313,11 @@ const TEMPLATE = /* html */`
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">מיקום / רשות *</label>
-            <input v-model="draft.location" class="form-control" placeholder="שם הרשות / יישוב / אזור" />
+            <select v-model="draft.location" class="form-control" :disabled="!cityList.length">
+              <option value="" disabled>{{ cityList.length ? 'בחר יישוב...' : 'טוען רשימת יישובים...' }}</option>
+              <option v-for="c in cityList" :key="c" :value="c">{{ c }}</option>
+            </select>
+            <div class="form-hint">הרחובות בתרגיל יישאבו רק מהיישוב שנבחר.</div>
           </div>
           <div class="form-group">
             <label class="form-label">סוג תרגיל</label>
@@ -2234,6 +2238,7 @@ Vue.createApp({
       currentUserRole: 'user',
       editUserId: null,
       editUserRole: 'user',
+      cityList: [],
       // expose constants to template
       SCENARIOS, SEC_SCENARIOS, UNITS, RELIABILITY, EXERCISE_TYPES, AI_PROVIDERS,
       wizardSteps: ['פרמטרים','תרחיש','מכלולים','הזרמות','עריכה','אוכלוסייה','ציפיות'],
@@ -2794,7 +2799,9 @@ Vue.createApp({
   },
   mounted() {
     this.loadData();
-    loadStreetsData();
+    loadStreetsData().then(data => {
+      this.cityList = Object.keys(data || {}).sort((a,b) => a.localeCompare(b, 'he'));
+    });
     initFirebase();
     if (fbAuth) {
       fbAuth.onAuthStateChanged(async (user) => {
