@@ -156,6 +156,27 @@ async function callAI(provider, apiKey, prompt, maxTokens = 4000) {
   return callAnthropic(apiKey, prompt, maxTokens);
 }
 
+// מחלץ JSON תקין מתשובת AI חופשית: מסיר גדרות markdown, ואם עדיין לא תקין —
+// מאתר את התת-מחרוזת המאוזנת הראשונה ([...]/{... }) ומנסה לפרסר רק אותה.
+// כך תוספת טקסט/הסבר לפני או אחרי ה-JSON (שכיח אצל מודלי AI) לא תגרום לנפילה לתבניות.
+function extractJsonFromAI(raw) {
+  let s = String(raw || '').replace(/```json\n?|```\n?/g, '').trim();
+  try { return JSON.parse(s); } catch {}
+  // קובע איזה סוג סוגר (אובייקט/מערך) הוא ה-JSON החיצוני האמיתי לפי מי שמופיע ראשון בטקסט —
+  // כדי לא להתבלבל ממערך מקונן ריק (למשל "zones":[]) שמופיע לפני הסגירה האמיתית.
+  const firstObj = s.indexOf('{');
+  const firstArr = s.indexOf('[');
+  if (firstObj === -1 && firstArr === -1) throw new Error('תשובת ה-AI לא הייתה JSON תקין');
+  const useArray = firstArr !== -1 && (firstObj === -1 || firstArr < firstObj);
+  const open = useArray ? '[' : '{', close = useArray ? ']' : '}';
+  const start = s.indexOf(open);
+  const end = s.lastIndexOf(close);
+  if (start !== -1 && end > start) {
+    try { return JSON.parse(s.slice(start, end+1)); } catch {}
+  }
+  throw new Error('תשובת ה-AI לא הייתה JSON תקין');
+}
+
 async function callAnthropic(apiKey, prompt, maxTokens) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -496,24 +517,54 @@ function buildCtx(draft) {
   };
 }
 
+// תבניות גנריות "המשך/עדכון" — משמשות רק כשנדרשות יותר הזרמות ממספר התבניות הספציפיות
+// לתרחיש, כדי שלא ייווצרו משפטים זהים מילה במילה (אותה תבנית + אותו ctx = טקסט זהה).
+const GENERIC_FILLER_TPL = [
+  {rep:'מנהל תרגיל', type:'עדכון', rel:'A', tpl:'עדכון תמונת מצב: הפעילות בשטח ממשיכה כמתוכנן, אין שינוי מהותי.'},
+  {rep:'יקל"ר',       type:'עדכון', rel:'B', tpl:'תיאום בין הגורמים המשתתפים ממשיך — אין דרישות חדשות מהנפה כעת.'},
+  {rep:'מוקד',        type:'דיווח', rel:'A', tpl:'עדכון יומן אירוע: כל הדיווחים האחרונים תועדו והועברו למעקב.'},
+  {rep:'מ"פ',         type:'עדכון', rel:'B', tpl:'בדיקת מוכנות שגרתית: המכלולים בשטח מאשרים המשכיות פעילות.'},
+  {rep:'מנהל תרגיל', type:'בקשה',  rel:'A', tpl:'בקשה לעדכון תמונת מצב נוסף מכל המכלולים המשתתפים.'},
+  {rep:'נפה',         type:'עדכון', rel:'B', tpl:'תיאום לוגיסטי שוטף בין הרשות לנפה — ללא חריגות.'},
+];
+
+// בוחר את התבנית הקרובה ביותר בזמן מתוך מאגר זמין, ומוציא אותה מהמאגר כדי שלא תיבחר פעמיים
+function pickNearestAvailable(pool, frac) {
+  let bestIdx = 0, bestDist = Math.abs(pool[0].o - frac);
+  for (let k=1; k<pool.length; k++) {
+    const d = Math.abs(pool[k].o - frac);
+    if (d < bestDist) { bestDist = d; bestIdx = k; }
+  }
+  return pool.splice(bestIdx, 1)[0];
+}
+
 function generateInjections(draft) {
-  const tpls = INJ_TPL[draft.mainScenario] || INJ_TPL.earthquake;
+  const baseTpls = INJ_TPL[draft.mainScenario] || INJ_TPL.earthquake;
   const count = draft.injCount;
   const durMins = draft.durationHours * 60;
   const baseH = parseInt((draft.startTime||'08:00').split(':')[0],10)*60 + parseInt((draft.startTime||'08:00').split(':')[1],10);
   const ctx = buildCtx(draft);
-  const reliMap = {A:'A',B:'B',C:'C',D:'D'};
   const reliPrf = draft.reliabilityProfile; // uniform | mixed | degrading
+
+  // מקצה תבנית ייחודית לכל הזרמה: מעבר ראשון משתמש בכל התבניות הספציפיות לתרחיש (ללא חזרה),
+  // ורק אם injCount עולה על מספרן — ההזרמות הנוספות מקבלות תבנית "המשך/עדכון" גנרית.
+  const pool = baseTpls.slice().sort((a,b)=>a.o-b.o);
+  let fillerPool = [];
+  const assigned = [];
+  for (let i = 0; i < count; i++) {
+    const frac = count===1 ? 0 : i/(count-1);
+    if (pool.length > 0) {
+      assigned.push(pickNearestAvailable(pool, frac));
+    } else {
+      if (fillerPool.length === 0) fillerPool = GENERIC_FILLER_TPL.slice();
+      assigned.push(fillerPool.splice(Math.floor(Math.random()*fillerPool.length), 1)[0]);
+    }
+  }
 
   const result = [];
   for (let i = 0; i < count; i++) {
     const frac = count===1 ? 0 : i/(count-1);
-    // Find nearest template
-    let best = tpls[0];
-    let bestDist = Math.abs(tpls[0].o - frac);
-    tpls.forEach(t => { const d = Math.abs(t.o - frac); if(d<bestDist){bestDist=d;best=t;} });
-    // Sometimes cycle if few templates
-    const tpl = tpls[i % tpls.length];
+    const best = assigned[i];
     const timeMins = Math.round(frac * durMins);
     const timeStr = minsToTime(timeMins, baseH);
 
@@ -850,16 +901,42 @@ function generatePopulationStory(draft) {
   const zoneCount = SINGLE_SITE.includes(mainScenario) ? 1 : (({1:1,2:2,3:3})[complexity]||2);
   const siteTypes = ['בניין מגורים','מוסד ציבורי','בית פרטי','מפעל / מחסן','מוסד חינוכי','בניין משרדים','כולל / ישיבה'];
 
-  const bgByScenario = (street, houseNum, siteType, popAtSite, floors) => ({
-    earthquake: `בבניין רחוב ${street} ${houseNum} — ${siteType} בן ${floors} קומות — שהו ${popAtSite} אנשים בזמן הרעידה. חלק מהדיירים היו בממ"דים, אחרים בחדרים פתוחים. בעקבות הרעידה קרס חלק מהמבנה ונחסמו יציאות מהקומות.`,
-    combat:     `ברחוב ${street} ${houseNum} — ${siteType} — שהו ${popAtSite} אנשים בזמן האזעקה. לאחר ירידה למקלט, פגעה רקטה ישירות במבנה. חלק מהשוהים לא הספיקו לרדת.`,
-    mass_cas:   `באזור רחוב ${street} ${houseNum} — ${siteType} — שהו ${popAtSite} אנשים שנפגעו באירוע. הנפגעים פזורים בשטח רחב.`,
-    fire:       `ברחוב ${street} ${houseNum} — ${siteType} — שהו ${popAtSite} אנשים כאשר פרצה האש. חלק פונו בזמן, אחרים נלכדו בקומות עליונות.`,
-    flood:      `ברחוב ${street} ${houseNum} — ${siteType} — נלכדו ${popAtSite} אנשים בהצפות. רמות המים עלו מהר ולא אפשרו יציאה.`,
-    chemical:   `ברחוב ${street} ${houseNum} — ${siteType} — היו ${popAtSite} אנשים בזמן הדליפה. חלק קיבלו הוראה להתבצר, אחרים חולצו.`,
-    traffic:    `בכביש סמוך לרחוב ${street} נפגעו ${popAtSite} אנשים שהיו בכלי הרכב. מספר לכודים בשברי הרכבים.`,
-    infra:      `ברחוב ${street} ${houseNum} — ${siteType} — שהו ${popAtSite} אנשים בעת קריסת התשתית. חלק נפגעו ישירות.`,
-  })[mainScenario] || `ברחוב ${street} ${houseNum} — ${siteType} — שהו ${popAtSite} אנשים בעת האירוע.`;
+  // כמה ניסוחים שונים לכל תרחיש (נבחר אקראית לכל זירה) — כדי שכמה זירות באותו תרגיל לא יקבלו
+  // את אותו פסקת-רקע מילה במילה (רק שמות/מספרים מוחלפים).
+  const bgByScenario = (street, houseNum, siteType, popAtSite, floors) => pick({
+    earthquake: [
+      `בבניין רחוב ${street} ${houseNum} — ${siteType} בן ${floors} קומות — שהו ${popAtSite} אנשים בזמן הרעידה. חלק מהדיירים היו בממ"דים, אחרים בחדרים פתוחים. בעקבות הרעידה קרס חלק מהמבנה ונחסמו יציאות מהקומות.`,
+      `${siteType} ברחוב ${street} ${houseNum}, בן ${floors} קומות, ספג נזק משמעותי מהרעידה. ${popAtSite} אנשים שהו במקום בעת האירוע — חלקם הצליחו לצאת בכוחות עצמם, אחרים נותרו לכודים בתוך המבנה הפגוע.`,
+    ],
+    combat: [
+      `ברחוב ${street} ${houseNum} — ${siteType} — שהו ${popAtSite} אנשים בזמן האזעקה. לאחר ירידה למקלט, פגעה רקטה ישירות במבנה. חלק מהשוהים לא הספיקו לרדת.`,
+      `פגיעה ישירה ב${siteType} ברחוב ${street} ${houseNum}. בעת נפילת הרקטה שהו במקום ${popAtSite} אנשים — חלקם הספיקו להיכנס למרחב מוגן, אחרים נתפסו במרחב הפתוח.`,
+    ],
+    mass_cas: [
+      `באזור רחוב ${street} ${houseNum} — ${siteType} — שהו ${popAtSite} אנשים שנפגעו באירוע. הנפגעים פזורים בשטח רחב.`,
+      `${siteType} ברחוב ${street} ${houseNum} הפך לזירת האירוע המרכזית. ${popAtSite} אנשים נכחו במקום בזמן האירוע, חלקם נפגעו ישירות.`,
+    ],
+    fire: [
+      `ברחוב ${street} ${houseNum} — ${siteType} — שהו ${popAtSite} אנשים כאשר פרצה האש. חלק פונו בזמן, אחרים נלכדו בקומות עליונות.`,
+      `שריפה התפשטה ל${siteType} ברחוב ${street} ${houseNum}. ${popAtSite} אנשים היו בתוך המבנה כשהאש פרצה — חלקם הצליחו להימלט, אחרים נותרו חסומים בקומות העליונות.`,
+    ],
+    flood: [
+      `ברחוב ${street} ${houseNum} — ${siteType} — נלכדו ${popAtSite} אנשים בהצפות. רמות המים עלו מהר ולא אפשרו יציאה.`,
+      `מי השיטפון הציפו את ${siteType} ברחוב ${street} ${houseNum}. ${popAtSite} אנשים נמצאו במקום כשהמים עלו במהירות, ולא כולם הצליחו לפנות בזמן.`,
+    ],
+    chemical: [
+      `ברחוב ${street} ${houseNum} — ${siteType} — היו ${popAtSite} אנשים בזמן הדליפה. חלק קיבלו הוראה להתבצר, אחרים חולצו.`,
+      `ענן הדליפה הגיע ל${siteType} ברחוב ${street} ${houseNum}, שם שהו ${popAtSite} אנשים. חלקם הספיקו להתבצר במקום, אחרים נחשפו לחומר.`,
+    ],
+    traffic: [
+      `בכביש סמוך לרחוב ${street} נפגעו ${popAtSite} אנשים שהיו בכלי הרכב. מספר לכודים בשברי הרכבים.`,
+      `תאונה קשה התרחשה בכביש סמוך לרחוב ${street}. ${popAtSite} אנשים היו מעורבים באירוע, כשחלקם נלכדו בתוך כלי הרכב.`,
+    ],
+    infra: [
+      `ברחוב ${street} ${houseNum} — ${siteType} — שהו ${popAtSite} אנשים בעת קריסת התשתית. חלק נפגעו ישירות.`,
+      `קריסת התשתית פגעה ב${siteType} ברחוב ${street} ${houseNum}. ${popAtSite} אנשים שהו במקום בעת הקריסה — חלקם נפגעו ישירות מהאירוע.`,
+    ],
+  }[mainScenario] || [`ברחוב ${street} ${houseNum} — ${siteType} — שהו ${popAtSite} אנשים בעת האירוע.`]);
 
   let zonesSections = '';
   let totKilled=0, totSerious=0, totMod=0, totLight=0, totTrapped=0, totMissing=0;
@@ -917,31 +994,57 @@ function generatePopulationStory(draft) {
     const roster = renderRoster(residents);
 
     // ── דיווחים נושאי-שם בתוך הזירה (חפ"ק גדוד, איתורים, פינויים, פתרון נעדרים) ──
+    // ניסוחים מרובים לכל סוג דיווח — נבחר אקראית, כדי שכמה זירות לא יקבלו את אותה שורה מילה במילה.
     let t = reportMin;
     const beats = [];
-    beats.push([t, `${killed||trapped ? 'אותרו נפגעים ראשונים באתר' : 'מתקבל דיווח ראשוני מהשטח'}: ${rnd(2,6)*Math.ceil(m)} פצועים בדרגות שונות.`, 'כוחות בשטח']);
+    beats.push([t, pick(killed||trapped ? [
+      `אותרו נפגעים ראשונים באתר: ${rnd(2,6)*Math.ceil(m)} פצועים בדרגות שונות.`,
+      `דיווח ראשוני מהשטח: ${rnd(2,6)*Math.ceil(m)} פצועים אותרו עד כה באתר.`,
+    ] : [
+      `מתקבל דיווח ראשוני מהשטח: ${rnd(2,6)*Math.ceil(m)} פצועים בדרגות שונות.`,
+      `כוחות ראשונים בזירה מדווחים על ${rnd(2,6)*Math.ceil(m)} פצועים בדרגות שונות.`,
+    ]), 'כוחות בשטח']);
 
     t += rnd(8,14);
-    beats.push([t, `חפ"ק גדוד מגיע לזירה ומתחיל לאסוף תמונת מצב מהכוחות בשטח.`, 'גדוד']);
+    beats.push([t, pick([
+      `חפ"ק גדוד מגיע לזירה ומתחיל לאסוף תמונת מצב מהכוחות בשטח.`,
+      `חפ"ק גדוד מגיע לזירה ומתחיל בקבלת תמונת מצב מהכוחות הפועלים במקום.`,
+      `חפ"ק גדוד נכנס לפעולה בזירה ופותח בריכוז המידע מהשטח.`,
+    ]), 'גדוד']);
 
     if (injuredPeople.length) {
       t += rnd(3,6);
       const names = injuredPeople.slice(0,3).map(fullName).join(', ');
-      beats.push([t, `דיווח חפ"ק: אותרו פצועים — ${names}${injuredPeople.length>3?' ועוד':''}.`, 'גדוד']);
+      const more = injuredPeople.length>3?' ועוד':'';
+      beats.push([t, pick([
+        `דיווח חפ"ק: אותרו פצועים — ${names}${more}.`,
+        `עדכון מהשטח: פצועים שאותרו — ${names}${more}.`,
+      ]), 'גדוד']);
     }
     if (trappedPeople.length) {
       t += rnd(3,6);
-      beats.push([t, `דיווח חפ"ק: חשש ל-${trappedPeople.length} לכודים בתוך ${siteType==='בית פרטי'?'הבית':'המבנה'}.`, 'גדוד']);
+      const place = siteType==='בית פרטי'?'הבית':'המבנה';
+      beats.push([t, pick([
+        `דיווח חפ"ק: חשש ל-${trappedPeople.length} לכודים בתוך ${place}.`,
+        `חפ"ק מעריך כי ${trappedPeople.length} אנשים לכודים בתוך ${place}.`,
+      ]), 'גדוד']);
     }
     if (killedPeople.length) {
       t += rnd(4,8);
       const names = killedPeople.slice(0,2).map(fullName).join(', ');
-      beats.push([t, `אותרו הרוגים: ${names}${killedPeople.length>2?' ועוד':''}.`, 'לוחמי חילוץ']);
+      const more = killedPeople.length>2?' ועוד':'';
+      beats.push([t, pick([
+        `אותרו הרוגים: ${names}${more}.`,
+        `דיווח עגום מהשטח: נמצאו הרוגים — ${names}${more}.`,
+      ]), 'לוחמי חילוץ']);
     }
     if (missingPeople.length) {
       t += rnd(2,5);
       const names = missingPeople.map(fullName).join(', ');
-      beats.push([t, `אזרחים מדווחים על נעדרים: ${names}.`, 'אזרחים']);
+      beats.push([t, pick([
+        `אזרחים מדווחים על נעדרים: ${names}.`,
+        `התקבלו דיווחי תושבים על נעדרים: ${names}.`,
+      ]), 'אזרחים']);
     }
 
     t += rnd(4,8);
@@ -949,7 +1052,10 @@ function generatePopulationStory(draft) {
 
     if (trappedPeople.length) {
       t += rnd(6,12);
-      beats.push([t, `דיווח חפ"ק: ${trappedPeople.length} הלכודים חולצו.`, 'גדוד']);
+      beats.push([t, pick([
+        `דיווח חפ"ק: ${trappedPeople.length} הלכודים חולצו.`,
+        `עדכון חפ"ק: כל הלכודים חולצו מהזירה.`,
+      ]), 'גדוד']);
     }
 
     // פתרון נעדרים — ברוב המקרים מתברר שלא היו בזירה, ולעיתים שמדובר בהרוג נוסף
@@ -967,7 +1073,10 @@ function generatePopulationStory(draft) {
     if (resolvedMissing.length) {
       t += rnd(8,15);
       const lines = resolvedMissing.map(p => `${fullName(p)} — ${pick(['לא היה/הייתה בזירה בזמן הפגיעה','אותר/ה מחוץ לזירה','אותר/ה אצל שכנים','נמצא/ה בבית ספר/עבודה'])}`).join('; ');
-      beats.push([t, `מתברר כי הנעדרים אותרו בטוחים: ${lines}.`, 'מש"ק אוכלוסייה']);
+      beats.push([t, pick([
+        `מתברר כי הנעדרים אותרו בטוחים: ${lines}.`,
+        `עדכון מש"ק אוכלוסייה: הנעדרים אותרו ונמצאו בטוחים — ${lines}.`,
+      ]), 'מש"ק אוכלוסייה']);
     }
 
     const finalKilled = killedPeople.length;
@@ -2419,8 +2528,8 @@ Vue.createApp({
         this.apiLoading = 'מייצר הזרמות עם AI...';
         try {
           const raw = await callAI(provider, apiKey, buildInjectionPrompt(this.draft));
-          const jsonStr = raw.replace(/```json\n?|\n?```/g, '').trim();
-          const parsed = JSON.parse(jsonStr);
+          const parsed = extractJsonFromAI(raw);
+          if (!Array.isArray(parsed) || !parsed.length) throw new Error('תשובת ה-AI לא הכילה רשימת הזרמות');
           this.draft.injections = parsed.map((inj, i) => ({
             id: uid(), order: i+1,
             time: inj.time || '',
@@ -2445,9 +2554,9 @@ Vue.createApp({
         if (useApi) {
           this.apiLoading = 'מייצר סיפור אוכלוסייה עם AI...';
           try {
-            const raw = await callAI(provider, apiKey, buildStoryJsonPrompt(this.draft), 8000);
-            const jsonStr = raw.replace(/```json\n?|\n?```/g, '').trim();
-            const parsed = JSON.parse(jsonStr);
+            const raw = await callAI(provider, apiKey, buildStoryJsonPrompt(this.draft), 12000);
+            const parsed = extractJsonFromAI(raw);
+            if (!parsed || !Array.isArray(parsed.zones) || !parsed.zones.length) throw new Error('תשובת ה-AI לא הכילה זירות תקינות');
             const { text, zones, intro } = buildStoryFromAIJson(this.draft, parsed);
             this.draft.populationStory = text;
             this.draft.populationZones = zones;
