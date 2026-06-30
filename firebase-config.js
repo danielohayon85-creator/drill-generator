@@ -1,13 +1,12 @@
 'use strict';
 // מפתחות Firebase — אלו ערכי תצורה ציבוריים (לא סודיים), בטוחים לחשיפה בקוד לקוח.
-// יש למלא לאחר יצירת הפרויקט ב-https://console.firebase.google.com
 const FIREBASE_CONFIG = {
-  apiKey: 'REPLACE_ME',
-  authDomain: 'REPLACE_ME.firebaseapp.com',
-  projectId: 'REPLACE_ME',
-  storageBucket: 'REPLACE_ME.appspot.com',
-  messagingSenderId: 'REPLACE_ME',
-  appId: 'REPLACE_ME',
+  apiKey: 'AIzaSyAuShxxF6I0KiB-FWO4Fr9xkpDDuAihV1E',
+  authDomain: 'drillgen-d3619.firebaseapp.com',
+  projectId: 'drillgen-d3619',
+  storageBucket: 'drillgen-d3619.firebasestorage.app',
+  messagingSenderId: '424325201995',
+  appId: '1:424325201995:web:91d2d96277b4db58dc8dce',
 };
 
 // כתובות מייל שיוצגו כאדמין בממשק (תצוגה בלבד — האבטחה האמיתית היא ב-Firestore rules / admins collection)
