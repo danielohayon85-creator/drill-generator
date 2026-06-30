@@ -65,6 +65,9 @@ const HOSPITALS = ['רמב"ם','איכילוב','בני ציון','הלל יפה
 /* ═══════════════════════════════════════════════════
    AUTH (Firebase) — התחברות, ניהול משתמשים, יומן פעילות
 ═══════════════════════════════════════════════════ */
+const USER_ROLES = ['super_admin', 'supervisor', 'employee'];
+const USER_ROLE_LABELS = { super_admin: 'אדמין על', supervisor: 'ממונה', employee: 'עובד' };
+
 let fbApp = null, fbAuth = null, fbDb = null;
 
 function initFirebase() {
@@ -88,7 +91,7 @@ async function ensureUserDoc(user) {
     if (!snap.exists) {
       const data = {
         email: user.email,
-        role: 'user',
+        role: 'employee',
         disabled: false,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1293,8 +1296,9 @@ const TEMPLATE = /* html */`
   <div v-if="view==='home'" class="home-wrap">
     <div v-if="authUser" class="user-bar">
       <span class="user-bar-email">{{ authUser.email }}</span>
+      <span class="badge" :class="isAdmin ? 'badge-blue' : (isSupervisor ? 'badge-gray' : 'badge-gray')" style="font-size:11px">{{ roleLabel }}</span>
       <button v-if="isAdmin" class="btn btn-ghost btn-sm" @click="openAdmin">
-        <iconify-icon icon="fluent:people-24-regular" aria-hidden="true"></iconify-icon> לוח אדמין
+        <iconify-icon icon="fluent:people-24-regular" aria-hidden="true"></iconify-icon> ניהול משתמשים
       </button>
       <button class="btn btn-ghost btn-sm" @click="authLogout">
         <iconify-icon icon="fluent:arrow-upload-24-regular" style="transform:rotate(90deg)" aria-hidden="true"></iconify-icon> התנתקות
@@ -2008,14 +2012,15 @@ const TEMPLATE = /* html */`
         <span>{{ adminUsers.filter(u=>!u.disabled).length }} פעילים</span>
       </div>
 
+      <!-- ── אדמין על ── -->
       <div class="user-group">
         <div class="user-group-head admins">
           <iconify-icon icon="fluent:shield-checkmark-24-regular" aria-hidden="true"></iconify-icon>
-          <span>מנהלים</span>
-          <span class="user-count admins">{{ adminUsers.filter(u=>u.role==='admin').length }}</span>
+          <span>אדמין על</span>
+          <span class="user-count admins">{{ adminUsers.filter(u=>u.role==='super_admin').length }}</span>
         </div>
-        <div v-if="adminUsers.filter(u=>u.role==='admin').length===0" class="user-group-empty">אין מנהלים</div>
-        <div v-for="u in adminUsers.filter(u=>u.role==='admin')" :key="u.id" class="user-row" :class="{disabled: u.disabled}">
+        <div v-if="adminUsers.filter(u=>u.role==='super_admin').length===0" class="user-group-empty">אין אדמינים</div>
+        <div v-for="u in adminUsers.filter(u=>u.role==='super_admin')" :key="u.id" class="user-row" :class="{disabled: u.disabled}">
           <div class="user-avatar admin">{{ (u.email||'?').charAt(0).toUpperCase() }}</div>
           <div v-if="editUserId!==u.id" class="user-info">
             <div class="user-info-top">
@@ -2027,8 +2032,9 @@ const TEMPLATE = /* html */`
           </div>
           <div v-else class="user-info">
             <select v-model="editUserRole" class="form-control" style="max-width:160px;display:inline-block">
-              <option value="user">משתמש</option>
-              <option value="admin">מנהל</option>
+              <option value="super_admin">אדמין על</option>
+              <option value="supervisor">ממונה</option>
+              <option value="employee">עובד</option>
             </select>
           </div>
           <div class="user-actions">
@@ -2037,8 +2043,8 @@ const TEMPLATE = /* html */`
               <button class="btn btn-ghost btn-sm" @click="cancelEditUser">ביטול</button>
             </template>
             <template v-else>
-              <span class="badge" :class="u.role==='admin' ? 'badge-blue' : 'badge-gray'">{{ u.role==='admin' ? 'מנהל' : 'משתמש' }}</span>
-              <button class="btn btn-ghost btn-sm" @click="startEditUser(u)">ערוך</button>
+              <span class="badge badge-blue">אדמין על</span>
+              <button class="btn btn-ghost btn-sm" :disabled="authUser && u.id===authUser.uid" @click="startEditUser(u)">ערוך</button>
               <button class="btn btn-sm" :class="u.disabled ? 'btn-success' : 'btn-ghost'" :disabled="authUser && u.id===authUser.uid" @click="toggleUserDisabled(u)">{{ u.disabled ? 'הפעל' : 'השבת' }}</button>
               <button class="btn btn-ghost btn-sm" style="color:var(--red)" :disabled="authUser && u.id===authUser.uid" @click="removeUserProfile(u)"><iconify-icon icon="fluent:delete-24-regular" aria-hidden="true"></iconify-icon></button>
             </template>
@@ -2046,14 +2052,55 @@ const TEMPLATE = /* html */`
         </div>
       </div>
 
+      <!-- ── ממונים ── -->
+      <div class="user-group">
+        <div class="user-group-head" style="background:var(--navy-light,#e8edf5)">
+          <iconify-icon icon="fluent:person-star-24-regular" aria-hidden="true"></iconify-icon>
+          <span>ממונים</span>
+          <span class="user-count" style="background:var(--navy)">{{ adminUsers.filter(u=>u.role==='supervisor').length }}</span>
+        </div>
+        <div v-if="adminUsers.filter(u=>u.role==='supervisor').length===0" class="user-group-empty">אין ממונים</div>
+        <div v-for="u in adminUsers.filter(u=>u.role==='supervisor')" :key="u.id" class="user-row" :class="{disabled: u.disabled}">
+          <div class="user-avatar" style="background:var(--navy)">{{ (u.email||'?').charAt(0).toUpperCase() }}</div>
+          <div v-if="editUserId!==u.id" class="user-info">
+            <div class="user-info-top">
+              <span class="user-email">{{ u.email }}</span>
+              <span v-if="authUser && u.id===authUser.uid" class="badge badge-blue">אתה</span>
+              <span v-if="u.disabled" class="badge badge-red">מושבת</span>
+            </div>
+            <div class="user-meta">התחבר {{ u.loginCount||1 }} פעמים · אחרון: {{ fmtTimestamp(u.lastLogin) }}</div>
+          </div>
+          <div v-else class="user-info">
+            <select v-model="editUserRole" class="form-control" style="max-width:160px;display:inline-block">
+              <option value="super_admin">אדמין על</option>
+              <option value="supervisor">ממונה</option>
+              <option value="employee">עובד</option>
+            </select>
+          </div>
+          <div class="user-actions">
+            <template v-if="editUserId===u.id">
+              <button class="btn btn-success btn-sm" @click="saveEditUser(u)">שמור</button>
+              <button class="btn btn-ghost btn-sm" @click="cancelEditUser">ביטול</button>
+            </template>
+            <template v-else>
+              <span class="badge" style="background:var(--navy);color:#fff">ממונה</span>
+              <button class="btn btn-ghost btn-sm" @click="startEditUser(u)">ערוך</button>
+              <button class="btn btn-sm" :class="u.disabled ? 'btn-success' : 'btn-ghost'" @click="toggleUserDisabled(u)">{{ u.disabled ? 'הפעל' : 'השבת' }}</button>
+              <button class="btn btn-ghost btn-sm" style="color:var(--red)" @click="removeUserProfile(u)"><iconify-icon icon="fluent:delete-24-regular" aria-hidden="true"></iconify-icon></button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── עובדים ── -->
       <div class="user-group">
         <div class="user-group-head">
           <iconify-icon icon="fluent:people-24-regular" aria-hidden="true"></iconify-icon>
-          <span>משתמשים</span>
-          <span class="user-count">{{ adminUsers.filter(u=>u.role!=='admin').length }}</span>
+          <span>עובדים</span>
+          <span class="user-count">{{ adminUsers.filter(u=>u.role==='employee'||!u.role).length }}</span>
         </div>
-        <div v-if="adminUsers.filter(u=>u.role!=='admin').length===0" class="user-group-empty">אין משתמשים</div>
-        <div v-for="u in adminUsers.filter(u=>u.role!=='admin')" :key="u.id" class="user-row" :class="{disabled: u.disabled}">
+        <div v-if="adminUsers.filter(u=>u.role==='employee'||!u.role).length===0" class="user-group-empty">אין עובדים</div>
+        <div v-for="u in adminUsers.filter(u=>u.role==='employee'||!u.role)" :key="u.id" class="user-row" :class="{disabled: u.disabled}">
           <div class="user-avatar">{{ (u.email||'?').charAt(0).toUpperCase() }}</div>
           <div v-if="editUserId!==u.id" class="user-info">
             <div class="user-info-top">
@@ -2065,8 +2112,9 @@ const TEMPLATE = /* html */`
           </div>
           <div v-else class="user-info">
             <select v-model="editUserRole" class="form-control" style="max-width:160px;display:inline-block">
-              <option value="user">משתמש</option>
-              <option value="admin">מנהל</option>
+              <option value="super_admin">אדמין על</option>
+              <option value="supervisor">ממונה</option>
+              <option value="employee">עובד</option>
             </select>
           </div>
           <div class="user-actions">
@@ -2075,7 +2123,7 @@ const TEMPLATE = /* html */`
               <button class="btn btn-ghost btn-sm" @click="cancelEditUser">ביטול</button>
             </template>
             <template v-else>
-              <span class="badge badge-gray">משתמש</span>
+              <span class="badge badge-gray">עובד</span>
               <button class="btn btn-ghost btn-sm" @click="startEditUser(u)">ערוך</button>
               <button class="btn btn-sm" :class="u.disabled ? 'btn-success' : 'btn-ghost'" @click="toggleUserDisabled(u)">{{ u.disabled ? 'הפעל' : 'השבת' }}</button>
               <button class="btn btn-ghost btn-sm" style="color:var(--red)" @click="removeUserProfile(u)"><iconify-icon icon="fluent:delete-24-regular" aria-hidden="true"></iconify-icon></button>
@@ -2344,7 +2392,7 @@ Vue.createApp({
       adminLogs: [],
       adminUsers: [],
       adminLoading: false,
-      currentUserRole: 'user',
+      currentUserRole: 'employee',
       editUserId: null,
       editUserRole: 'user',
       cityList: [],
@@ -2378,7 +2426,18 @@ Vue.createApp({
     },
     isAuthConfigured() { return !!fbAuth; },
     isAdmin() {
-      return !!(this.authUser && ((typeof ADMIN_EMAILS !== 'undefined' && ADMIN_EMAILS.includes(this.authUser.email)) || this.currentUserRole === 'admin'));
+      return !!(this.authUser && (
+        (typeof ADMIN_EMAILS !== 'undefined' && ADMIN_EMAILS.includes(this.authUser.email)) ||
+        this.currentUserRole === 'super_admin' ||
+        this.currentUserRole === 'admin' // תאימות לאחור
+      ));
+    },
+    isSupervisor() {
+      return !!(this.authUser && (this.isAdmin || this.currentUserRole === 'supervisor'));
+    },
+    roleLabel() {
+      const legacy = { admin: 'אדמין על', user: 'עובד' };
+      return USER_ROLE_LABELS[this.currentUserRole] || legacy[this.currentUserRole] || this.currentUserRole;
     },
   },
   methods: {
@@ -2438,12 +2497,17 @@ Vue.createApp({
         this.toast(u.disabled ? 'המשתמש הושבת' : 'המשתמש הופעל', 'info');
       } catch(e) { this.toast('שגיאה: '+e.message, 'error'); }
     },
-    startEditUser(u) { this.editUserId = u.id; this.editUserRole = u.role || 'user'; },
+    startEditUser(u) {
+      this.editUserId = u.id;
+      // תאימות לאחור: ערכים ישנים admin→super_admin, user→employee
+      const legacy = { admin: 'super_admin', user: 'employee' };
+      this.editUserRole = legacy[u.role] || u.role || 'employee';
+    },
     cancelEditUser() { this.editUserId = null; },
     async saveEditUser(u) {
       try {
         await fbDb.collection('users').doc(u.id).update({ role: this.editUserRole });
-        if (this.editUserRole === 'admin') {
+        if (this.editUserRole === 'super_admin') {
           await fbDb.collection('admins').doc(u.id).set({ promotedBy: this.authUser.email, promotedAt: firebase.firestore.FieldValue.serverTimestamp() });
         } else {
           await fbDb.collection('admins').doc(u.id).delete();
@@ -2923,7 +2987,7 @@ Vue.createApp({
             this.authReady = true;
             return;
           }
-          this.currentUserRole = data ? (data.role || 'user') : 'user';
+          this.currentUserRole = data ? (data.role || 'employee') : 'employee';
           this.authUser = user;
           this.authReady = true;
           await logActivity('login');
