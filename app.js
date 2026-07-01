@@ -211,8 +211,8 @@ async function callOpenAI(apiKey, prompt, maxTokens) {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: maxTokens,
+      model: 'gpt-5',
+      max_completion_tokens: maxTokens,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
