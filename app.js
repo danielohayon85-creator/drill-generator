@@ -257,6 +257,9 @@ function buildInjectionPrompt(draft) {
   const streetsLine = realStreets && realStreets.length
     ? `\n• רחובות אמיתיים ב${draft.location} לשימוש (חובה להשתמש רק באלה, לא להמציא רחובות): ${realStreets.slice(0,12).join(', ')}`
     : '';
+  const zoneLocLine = (draft.zoneLocations && draft.zoneLocations.length)
+    ? `\n• זירות האירוע נמצאות במיקומים ספציפיים שנבחרו מראש — כשמזכירים כתובת של זירה, יש להשתמש רק באלה: ${draft.zoneLocations.map(z=>`רחוב ${z.street} ${z.houseNum}`).join(', ')}`
+    : '';
 
   return `אתה מומחה לבניית תרגילי חירום למפקדות נפה של פיקוד העורף בישראל.
 
@@ -265,7 +268,7 @@ function buildInjectionPrompt(draft) {
 • מיקום: ${draft.location}
 • תאריך: ${draft.date}  |  שעות: ${draft.startTime}–${endT}  (${draft.durationHours} שעות)
 • מספר הזרמות: ${draft.injCount}
-• מורכבות: ${complexityHe}${unitNames ? '\n• מכלולים: '+unitNames : ''}${streetsLine}
+• מורכבות: ${complexityHe}${unitNames ? '\n• מכלולים: '+unitNames : ''}${streetsLine}${zoneLocLine}
 
 כללים:
 1. פתח וסיים עם "מנהל תרגיל"
@@ -411,6 +414,25 @@ function loadStreetsData() {
   }
   return _streetsLoadPromise;
 }
+
+/* ═══════════════════════════════════════════════════
+   GOVMAP — טעינת ה-API הרשמי של govmap.gov.il לבחירת מיקומי זירות
+═══════════════════════════════════════════════════ */
+let _govmapScriptPromise = null;
+function loadGovMapScript() {
+  if (typeof govmap !== 'undefined') return Promise.resolve();
+  if (!_govmapScriptPromise) {
+    _govmapScriptPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://www.govmap.gov.il/govmap/api/govmap.api.js';
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('טעינת סקריפט GovMap נכשלה'));
+      document.head.appendChild(s);
+    });
+  }
+  return _govmapScriptPromise;
+}
+
 function getCityStreets(location) {
   if (!STREETS_DATA) return null;
   const loc = (location || '').trim();
@@ -425,6 +447,17 @@ function pickStreet(location) {
   return (real && real.length) ? pick(real) : pick(STREETS);
 }
 
+// זירה z (1-based) מקבלת את המיקום שנבחר עבורה במפה (מחזור על הרשימה אם יש פחות
+// מיקומים שנבחרו ממספר הזירות); אם לא נבחרו מיקומים כלל — נופלים חזרה לבחירה אקראית כברירת מחדל.
+function pickZoneLocation(draft, zoneIndex) {
+  const locs = draft.zoneLocations || [];
+  if (locs.length) {
+    const loc = locs[(zoneIndex - 1) % locs.length];
+    return { street: loc.street, houseNum: loc.houseNum };
+  }
+  return { street: pickStreet(draft.location), houseNum: rnd(1, 80) };
+}
+
 function fillVars(tpl, ctx) {
   return tpl.replace(/\{(\w+)\}/g, (_, k) => ctx[k] !== undefined ? ctx[k] : `[${k}]`);
 }
@@ -437,7 +470,7 @@ function buildCtx(draft) {
     loc: location, city,
     mag:  (4.5 + Math.random()*2).toFixed(1),
     depth: rnd(8,25),
-    street: pickStreet(location)+' '+rnd(1,60),
+    street: (() => { const zl = pickZoneLocation(draft, 1); return zl.street+' '+zl.houseNum; })(),
     hosp: pick(HOSPITALS),
     cas_l: rnd(10,40)*m|0,  cas_s: rnd(2,10)*m|0,
     tot_c: rnd(15,60)*m|0,  tot_s: rnd(3,12)*m|0,
@@ -795,6 +828,15 @@ function buildStoryJsonPrompt(draft) {
   const streetsLine = realStreets && realStreets.length
     ? `\nרחובות אמיתיים ב${draft.location} לשימוש (חובה להשתמש רק באלה, לא להמציא): ${realStreets.slice(0,12).join(', ')}`
     : '';
+  // אם נבחרו מיקומים ספציפיים במפה עבור הזירות — הם מחייבים (זירה 1 חייבת להיות במיקום 1 וכו'),
+  // במקום שה-AI יבחר מרשימת הרחובות הכללית.
+  const zoneLocLine = (draft.zoneLocations && draft.zoneLocations.length)
+    ? `\nמיקומי הזירות נקבעו מראש ואינם לבחירתך — חובה להשתמש בהם בדיוק, לפי הסדר:\n` +
+      Array.from({length: zoneCount}, (_, i) => {
+        const zl = pickZoneLocation(draft, i+1);
+        return `זירה ${i+1}: רחוב ${zl.street} ${zl.houseNum}`;
+      }).join('\n')
+    : '';
   return `אתה מומחה לבניית תרגילי חירום למפקדות נפה של פיקוד העורף בישראל.
 
 בנה סיפור אוכלוסייה מלא ומפורט לתרגיל, עם אוכלוסייה בעלת שם מלא (לא רק מספרים מצטברים):
@@ -802,7 +844,7 @@ function buildStoryJsonPrompt(draft) {
 • מיקום: ${draft.location}
 • גודל אוכלוסייה: ${draft.populationSize.toLocaleString('he-IL')} תושבים
 • שעת פתיחה: ${draft.startTime}
-• מספר זירות: ${zoneCount}${zoneCount===1 ? ' (נקודת פגיעה יחידה — זירה אחת מורכבת ורוויית אירועים, לא לפצל)' : ''}${streetsLine}
+• מספר זירות: ${zoneCount}${zoneCount===1 ? ' (נקודת פגיעה יחידה — זירה אחת מורכבת ורוויית אירועים, לא לפצל)' : ''}${zoneLocLine || streetsLine}
 
 הנחיות לכל זירה:
 1. אוכלוסייה בעלת שם: שם פרטי + שם משפחה עברי ריאליסטי + גיל לכל אדם (8–35 אנשים בזירה).
@@ -947,8 +989,9 @@ function generatePopulationStory(draft) {
   const zones = [];
 
   for (let z=1; z<=zoneCount; z++) {
-    const street   = pickStreet(location);
-    const houseNum = rnd(1,80);
+    const zoneLoc  = pickZoneLocation(draft, z);
+    const street   = zoneLoc.street;
+    const houseNum = zoneLoc.houseNum;
     const siteType = pick(siteTypes);
     const floors   = rnd(2,6);
     const popAtSite= rnd(8,35) * Math.max(1,Math.round(m));
@@ -1218,6 +1261,7 @@ function emptyDraft() {
     name: '',
     date: today,
     location: '',
+    zoneLocations: [],
     exerciseType: EXERCISE_TYPES[0],
     complexity: 2,
     durationHours: 4,
@@ -1472,8 +1516,58 @@ const TEMPLATE = /* html */`
       </div>
     </div>
 
-    <!-- STEP 2: Scenario -->
+    <!-- STEP 2: Zone locations on map -->
     <div v-if="step===2" class="wizard-card">
+      <div class="wizard-body">
+        <div class="story-section-title">מיקומי זירות</div>
+        <p class="text-muted mb-4">
+          סמן במפה נקודה או כמה נקודות בתוך {{ draft.location || 'היישוב שנבחר' }} — הזירות שייווצרו בתרגיל ימוקמו בכתובות שנבחרו כאן, לפי הסדר. זהו שלב אופציונלי: אם לא תבחר מיקומים, המערכת תבחר רחובות אקראיים מהיישוב.
+        </p>
+
+        <div v-if="settings.govmapToken" class="mb-4">
+          <div id="govmap-container" class="govmap-canvas"></div>
+          <div v-if="govmapLoading" class="info-box mt-2"><span>טוען מפה...</span></div>
+          <div v-if="govmapError" class="warn-box mt-2"><span>{{ govmapError }} — אפשר להוסיף מיקומים ידנית ברשימה למטה.</span></div>
+          <div class="form-hint mt-2" v-if="!govmapLoading && !govmapError">לחיצה על המפה מוסיפה סימון זירה בנקודה שנבחרה.</div>
+        </div>
+        <div v-else class="info-box mb-4">
+          <span>לא הוגדר טוקן GovMap — ניתן להגדיר ב<a href="#" @click.prevent="showSettings=true">הגדרות API</a> כדי לבחור מיקומים על מפה אינטראקטיבית. בינתיים אפשר להוסיף מיקומי זירות ידנית מרשימת הרחובות של היישוב:</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">רחוב</label>
+            <select v-model="manualStreet" class="form-control">
+              <option value="" disabled>{{ cityStreetOptions.length ? 'בחר רחוב...' : 'אין רשימת רחובות ליישוב זה' }}</option>
+              <option v-for="s in cityStreetOptions" :key="s" :value="s">{{ s }}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">מספר בית</label>
+            <input v-model.number="manualHouseNum" type="number" class="form-control" min="1" max="300" />
+          </div>
+          <div class="form-group" style="justify-content:flex-end;display:flex">
+            <button class="btn btn-secondary" @click="addManualZoneLocation" :disabled="!manualStreet">הוסף מיקום</button>
+          </div>
+        </div>
+
+        <div v-if="draft.zoneLocations.length>0" class="mt-4">
+          <div class="form-label mb-2">מיקומים שנבחרו ({{ draft.zoneLocations.length }}):</div>
+          <div v-for="(loc,i) in draft.zoneLocations" :key="loc.id" class="zoneloc-row">
+            <span class="zoneloc-index">{{ i+1 }}</span>
+            <span class="zoneloc-text">רחוב {{ loc.street }} {{ loc.houseNum }}</span>
+            <button class="btn btn-ghost btn-sm" @click="removeZoneLocation(loc.id)">✕</button>
+          </div>
+        </div>
+      </div>
+      <div class="wizard-footer">
+        <button class="btn btn-secondary" @click="step--">← חזרה</button>
+        <button class="btn btn-primary" @click="nextStep">המשך ←</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Scenario -->
+    <div v-if="step===3" class="wizard-card">
       <div class="wizard-body">
         <div class="story-section-title">תרחיש ראשי</div>
         <div class="scenario-grid mb-6">
@@ -1502,8 +1596,8 @@ const TEMPLATE = /* html */`
       </div>
     </div>
 
-    <!-- STEP 3: Units -->
-    <div v-if="step===3" class="wizard-card">
+    <!-- STEP 4: Units -->
+    <div v-if="step===4" class="wizard-card">
       <div class="wizard-body">
         <div class="story-section-title">מכלולים משתתפים</div>
         <p class="text-muted mb-4">בחר את הגורמים שמשתתפים בתרגיל. הם ישמשו ליצירת ציפיות ודגשים.</p>
@@ -1525,8 +1619,8 @@ const TEMPLATE = /* html */`
       </div>
     </div>
 
-    <!-- STEP 4: Injection params -->
-    <div v-if="step===4" class="wizard-card">
+    <!-- STEP 5: Injection params -->
+    <div v-if="step===5" class="wizard-card">
       <div class="wizard-body">
         <div class="story-section-title">פרמטרי הזרמות</div>
         <div class="form-row">
@@ -1564,8 +1658,8 @@ const TEMPLATE = /* html */`
       </div>
     </div>
 
-    <!-- STEP 5: Edit injections -->
-    <div v-if="step===5" class="wizard-card">
+    <!-- STEP 6: Edit injections -->
+    <div v-if="step===6" class="wizard-card">
       <div class="card-header">
         <span class="card-title"><iconify-icon icon="fluent:flash-24-regular" aria-hidden="true"></iconify-icon> לוח הזרמות — {{ draft.injections.length }} הזרמות</span>
         <button class="btn btn-secondary btn-sm" @click="runGenerate">ייצר מחדש</button>
@@ -1611,8 +1705,8 @@ const TEMPLATE = /* html */`
       </div>
     </div>
 
-    <!-- STEP 6: Population story -->
-    <div v-if="step===6" class="wizard-card">
+    <!-- STEP 7: Population story -->
+    <div v-if="step===7" class="wizard-card">
       <div class="wizard-body">
         <div class="story-section-title">סיפור האוכלוסייה</div>
         <div class="form-group">
@@ -1659,8 +1753,8 @@ const TEMPLATE = /* html */`
       </div>
     </div>
 
-    <!-- STEP 7: Expectations -->
-    <div v-if="step===7" class="wizard-card">
+    <!-- STEP 8: Expectations -->
+    <div v-if="step===8" class="wizard-card">
       <div class="wizard-body">
         <div class="story-section-title">ציפיות ודגשים</div>
         <div class="form-group">
@@ -1974,6 +2068,17 @@ const TEMPLATE = /* html */`
             <span style="font-weight:600">הפעל יצירת תוכן עם AI</span>
           </label>
           <div class="form-hint">כשמופעל — לחיצה על "צור הזרמות" תפנה למנוע ה-AI שנבחר. אם נכשל — חוזר לתבניות.</div>
+        </div>
+        <div class="divider mt-4 mb-4"></div>
+        <div class="form-group">
+          <label class="form-label">GovMap API Token (לבחירת מיקומי זירות על המפה)</label>
+          <input v-model="settings.govmapToken" class="form-control" placeholder="הדבק כאן טוקן שהתקבל מ-govmap.gov.il" style="direction:ltr;letter-spacing:.05em" />
+          <div class="form-hint">
+            נרשמים חינם בכתובת
+            <a href="https://api.govmap.gov.il/docs/intro/" target="_blank" rel="noopener">api.govmap.gov.il</a>
+            — הטוקן נעול לדומיין הרשום, כך שיש להירשם בנפרד לכתובת הפיתוח המקומית (localhost) ולכתובת האתר הציבורי.
+            ללא טוקן ניתן עדיין להוסיף מיקומי זירות ידנית מרשימת הרחובות של היישוב.
+          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -2398,7 +2503,13 @@ Vue.createApp({
       cityList: [],
       // expose constants to template
       SCENARIOS, SEC_SCENARIOS, UNITS, RELIABILITY, EXERCISE_TYPES, AI_PROVIDERS,
-      wizardSteps: ['פרמטרים','תרחיש','מכלולים','הזרמות','עריכה','אוכלוסייה','ציפיות'],
+      wizardSteps: ['פרמטרים','מיקומי זירות','תרחיש','מכלולים','הזרמות','עריכה','אוכלוסייה','ציפיות'],
+      manualStreet: '',
+      manualHouseNum: 1,
+      govmapLoading: false,
+      govmapError: '',
+      govmapLoaded: false,
+      govmapMap: null,
     };
   },
   computed: {
@@ -2424,6 +2535,7 @@ Vue.createApp({
       const p = AI_PROVIDERS.find(x=>x.id===this.settings.provider);
       return p ? p.name : 'AI';
     },
+    cityStreetOptions() { return getCityStreets(this.draft.location) || []; },
     isAuthConfigured() { return !!fbAuth; },
     isAdmin() {
       return !!(this.authUser && (
@@ -2438,6 +2550,15 @@ Vue.createApp({
     roleLabel() {
       const legacy = { admin: 'אדמין על', user: 'עובד' };
       return USER_ROLE_LABELS[this.currentUserRole] || legacy[this.currentUserRole] || this.currentUserRole;
+    },
+  },
+  watch: {
+    'draft.location'(newVal, oldVal) {
+      // מיקומי הזירות (רחובות) שנבחרו שייכים ליישוב הקודם — אם המשתמש חוזר לשלב 1 ומחליף יישוב, הם כבר לא רלוונטיים.
+      if (oldVal && newVal !== oldVal && this.draft.zoneLocations.length) {
+        this.draft.zoneLocations = [];
+        this.toast('מיקומי הזירות אופסו — היישוב הוחלף', 'warning');
+      }
     },
   },
   methods: {
@@ -2527,7 +2648,10 @@ Vue.createApp({
       } catch(e) { this.toast('שגיאה: '+e.message, 'error'); }
     },
 
-    startNew() { this.draft = emptyDraft(); this.step = 1; this.editingInjId = null; this.view = 'wizard'; },
+    startNew() {
+      this.draft = emptyDraft(); this.step = 1; this.editingInjId = null; this.view = 'wizard';
+      this.govmapMap = null; this.govmapError = ''; this.manualStreet = ''; this.manualHouseNum = 1;
+    },
     toggleSec(id) {
       const idx = this.draft.secondaryScenarios.indexOf(id);
       if (idx>=0) this.draft.secondaryScenarios.splice(idx,1);
@@ -2538,7 +2662,56 @@ Vue.createApp({
       const idx = this.draft.units.indexOf(id);
       if (idx>=0) this.draft.units.splice(idx,1); else this.draft.units.push(id);
     },
-    nextStep() { if (this.step < 7) this.step++; },
+    nextStep() {
+      if (this.step < 8) this.step++;
+      if (this.step === 2) this.$nextTick(() => this.initGovMap());
+    },
+    addManualZoneLocation() {
+      if (!this.manualStreet) return;
+      this.draft.zoneLocations.push({
+        id: uid(), street: this.manualStreet, houseNum: this.manualHouseNum || 1, address: '', x: null, y: null,
+      });
+      this.manualStreet = '';
+      this.manualHouseNum = 1;
+    },
+    addZoneLocationFromMap(street, houseNum, address, x, y) {
+      this.draft.zoneLocations.push({ id: uid(), street, houseNum, address, x, y });
+      if (this.govmapMap) {
+        try { this.govmapMap.setMapMarker({ x, y, iconType: 'circle' }); } catch (e) { /* marker is a visual aid only */ }
+      }
+      this.toast(`מיקום זירה ${this.draft.zoneLocations.length} נוסף`, 'success');
+    },
+    removeZoneLocation(id) {
+      this.draft.zoneLocations = this.draft.zoneLocations.filter(l => l.id !== id);
+    },
+    async initGovMap() {
+      if (!this.settings.govmapToken || this.govmapMap) return;
+      this.govmapError = '';
+      this.govmapLoading = true;
+      try {
+        await loadGovMapScript();
+        const map = await govmap.createMap('govmap-container', { token: this.settings.govmapToken });
+        this.govmapMap = map;
+        govmap.onEvent(govmap.events.CLICK, async (evt) => {
+          const x = evt.x ?? evt.point?.x, y = evt.y ?? evt.point?.y;
+          if (x == null || y == null) return;
+          try {
+            const res = await govmap.geocode({ x, y });
+            const address = (res && (res.address || res.Address || res.result)) || '';
+            const match = String(address).match(/^(.*?)\s+(\d+)/);
+            const street = match ? match[1].trim() : (address || 'נקודה שנבחרה');
+            const houseNum = match ? Number(match[2]) : 1;
+            this.addZoneLocationFromMap(street, houseNum, address, x, y);
+          } catch (e) {
+            this.toast('לא ניתן היה לזהות כתובת בנקודה שנבחרה — נסה נקודה אחרת או הוסף ידנית', 'warning');
+          }
+        });
+      } catch (e) {
+        this.govmapError = 'טעינת מפת GovMap נכשלה. ודא שהטוקן תקין ורשום לדומיין הנוכחי (' + location.hostname + ').';
+      } finally {
+        this.govmapLoading = false;
+      }
+    },
     finalizeExercise() {
       const ex = JSON.parse(JSON.stringify(this.draft));
       const idx = this.exercises.findIndex(e=>e.id===ex.id);
@@ -2650,7 +2823,7 @@ Vue.createApp({
       if (!this.draft.controllerHighlights) {
         this.draft.controllerHighlights = `• בדוק: האם הצוות מדווח ב-${Math.round(this.draft.durationHours*60/this.draft.injCount)} דקות לכל הזרמה?\n• בדוק: תיאום — האם גורמים משתתפים מתואמים?\n• בדוק: האם יומן האירוע מתועד כראוי?`;
       }
-      this.step = 5;
+      this.step = 6;
     },
 
     exportCSV() {
