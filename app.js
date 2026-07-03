@@ -253,19 +253,24 @@ function buildInjectionPrompt(draft) {
   const complexityHe = {1:'קלה',2:'בינונית',3:'גבוהה'}[draft.complexity];
   const [h,m] = (draft.startTime||'08:00').split(':').map(Number);
   const endT = `${padZ(Math.floor((h*60+m+draft.durationHours*60)/60)%24)}:${padZ((h*60+m+draft.durationHours*60)%60)}`;
-  const realStreets = getCityStreets(draft.location);
-  const streetsLine = realStreets && realStreets.length
-    ? `\n• רחובות אמיתיים ב${draft.location} לשימוש (חובה להשתמש רק באלה, לא להמציא רחובות): ${realStreets.slice(0,12).join(', ')}`
+  const cities = getDraftCities(draft);
+  const perCity = Math.max(4, Math.floor(12 / Math.max(1, cities.length)));
+  const streetsLine = cities.map(c => {
+    const s = getCityStreets(c);
+    return s && s.length ? `\n• רחובות אמיתיים ב${c} לשימוש (חובה להשתמש רק באלה, לא להמציא רחובות): ${s.slice(0, perCity).join(', ')}` : '';
+  }).join('');
+  const multiCityLine = cities.length > 1
+    ? ` — תרחיש רב-זירתי: פזר את האירועים והדיווחים בין כל היישובים, וציין בכל הזרמה רלוונטית לאיזה יישוב היא שייכת`
     : '';
   const zoneLocLine = (draft.zoneLocations && draft.zoneLocations.length)
-    ? `\n• זירות האירוע נמצאות במיקומים ספציפיים שנבחרו מראש — כשמזכירים כתובת של זירה, יש להשתמש רק באלה: ${draft.zoneLocations.map(z=>`רחוב ${z.street} ${z.houseNum}`).join(', ')}`
+    ? `\n• זירות האירוע נמצאות במיקומים ספציפיים שנבחרו מראש — כשמזכירים כתובת של זירה, יש להשתמש רק באלה: ${draft.zoneLocations.map(z=>`${z.city ? z.city+', ' : ''}רחוב ${z.street} ${z.houseNum}`).join('; ')}`
     : '';
 
   return `אתה מומחה לבניית תרגילי חירום למפקדות נפה של פיקוד העורף בישראל.
 
 בנה לוח הזרמות ריאליסטי לתרגיל:
 • תרחיש ראשי: ${scenarioName}${secNames ? '\n• תרחישים משניים: '+secNames : ''}
-• מיקום: ${draft.location}
+• מיקום: ${cities.join(', ') || draft.location}${multiCityLine}
 • תאריך: ${draft.date}  |  שעות: ${draft.startTime}–${endT}  (${draft.durationHours} שעות)
 • מספר הזרמות: ${draft.injCount}
 • מורכבות: ${complexityHe}${unitNames ? '\n• מכלולים: '+unitNames : ''}${streetsLine}${zoneLocLine}
@@ -447,15 +452,41 @@ function pickStreet(location) {
   return (real && real.length) ? pick(real) : pick(STREETS);
 }
 
+// כל היישובים של התרגיל: היישוב הראשי + יישובים נוספים אופציונליים (תרחיש רב-זירתי)
+function getDraftCities(draft) {
+  const extra = (draft.extraLocations || []).filter(Boolean);
+  return draft.location ? [draft.location, ...extra] : extra;
+}
+
+// מחרוזת תצוגה של מיקום התרגיל — "יישוב" או "יישוב א', יישוב ב'" בתרחיש רב-זירתי
+function locationDisplay(ex) {
+  const cities = getDraftCities(ex);
+  return cities.length ? cities.join(', ') : (ex.location || '');
+}
+
 // זירה z (1-based) מקבלת את המיקום שנבחר עבורה במפה (מחזור על הרשימה אם יש פחות
-// מיקומים שנבחרו ממספר הזירות); אם לא נבחרו מיקומים כלל — נופלים חזרה לבחירה אקראית כברירת מחדל.
+// מיקומים שנבחרו ממספר הזירות); אם לא נבחרו מיקומים — הזירות מתפזרות בין היישובים
+// שנבחרו (סבב), עם רחוב אקראי מרשימת הרחובות של אותו יישוב.
 function pickZoneLocation(draft, zoneIndex) {
   const locs = draft.zoneLocations || [];
+  const cities = getDraftCities(draft);
   if (locs.length) {
     const loc = locs[(zoneIndex - 1) % locs.length];
-    return { street: loc.street, houseNum: loc.houseNum };
+    return { city: loc.city || cities[0] || draft.location, street: loc.street, houseNum: loc.houseNum };
   }
-  return { street: pickStreet(draft.location), houseNum: rnd(1, 80) };
+  const city = cities.length ? cities[(zoneIndex - 1) % cities.length] : draft.location;
+  return { city, street: pickStreet(city), houseNum: rnd(1, 80) };
+}
+
+// מספר הזירות בתרגיל: אם נבחרו מיקומים ספציפיים — זירה לכל מיקום; אחרת לפי
+// מורכבות, ולפחות זירה אחת לכל יישוב בתרחיש רב-זירתי. תרחישי נקודת-פגיעה-יחידה
+// (טק"ק, חומ"ס, תאונה, ר"נ) נשארים זירה אחת רק כשיש יישוב יחיד.
+function getZoneCount(draft) {
+  const SINGLE_SITE = ['combat','chemical','traffic','mass_cas'];
+  const cities = getDraftCities(draft);
+  if (draft.zoneLocations && draft.zoneLocations.length) return Math.min(draft.zoneLocations.length, 8);
+  if (SINGLE_SITE.includes(draft.mainScenario) && cities.length <= 1) return 1;
+  return Math.max(({1:1,2:2,3:3})[draft.complexity]||2, Math.min(cities.length, 6));
 }
 
 function fillVars(tpl, ctx) {
@@ -465,12 +496,14 @@ function fillVars(tpl, ctx) {
 function buildCtx(draft) {
   const {location, populationSize, complexity, mainScenario} = draft;
   const m = ({1:.5,2:1,3:2})[complexity]||1;
+  const cities = getDraftCities(draft);
+  const multi = cities.length > 1;
   const city = location.split(' ').pop() || location;
   return {
-    loc: location, city,
+    loc: multi ? cities.join(', ') : location, city,
     mag:  (4.5 + Math.random()*2).toFixed(1),
     depth: rnd(8,25),
-    street: (() => { const zl = pickZoneLocation(draft, 1); return zl.street+' '+zl.houseNum; })(),
+    street: (() => { const zl = pickZoneLocation(draft, rnd(1, Math.max(1, cities.length))); return zl.street+' '+zl.houseNum+(multi ? ` ב${zl.city}` : ''); })(),
     hosp: pick(HOSPITALS),
     cas_l: rnd(10,40)*m|0,  cas_s: rnd(2,10)*m|0,
     tot_c: rnd(15,60)*m|0,  tot_s: rnd(3,12)*m|0,
@@ -785,7 +818,7 @@ function renderFullStory(draft, intro, zoneBlocks, summaryRows, severity, secTex
   const { populationSize, durationHours, complexity } = draft;
   const summaryHeader = `${'─'.repeat(80)}\n זירה        | מיקום                 | דיווח  | סוג אתר          | אוכ' | הרוגים | פצועים | לכודים\n${'─'.repeat(80)}`;
   const summaryBody = summaryRows.map(r =>
-    ` זירה ${r.z}      | רח' ${r.street} ${r.houseNum}`.padEnd(24) +
+    ` זירה ${r.z}      | ${r.city ? r.city+', ' : ''}רח' ${r.street} ${r.houseNum}`.padEnd(24) +
     `| ${r.reportTime}  | ${r.siteType.slice(0,16).padEnd(16)} | ${String(r.popAtSite).padEnd(4)} | ${String(r.killed).padEnd(6)} | ${String(r.injured).padEnd(6)} | ${r.trapped}`
   ).join('\n');
   const totKilled  = summaryRows.reduce((s,r)=>s+r.killed,0);
@@ -822,11 +855,15 @@ function buildStoryJsonPrompt(draft) {
     flood:'הצפה ושיטפון', chemical:'אירוע כימ"ב / חומ"ס', combat:'ירי רקטות / פגיעת טיל',
     traffic:'אסון תחבורה / ר"נ', infra:'קריסת תשתיות',
   };
-  const SINGLE_SITE = ['combat','chemical','traffic','mass_cas'];
-  const zoneCount = SINGLE_SITE.includes(draft.mainScenario) ? 1 : ({1:1,2:2,3:3}[draft.complexity]||2);
-  const realStreets = getCityStreets(draft.location);
-  const streetsLine = realStreets && realStreets.length
-    ? `\nרחובות אמיתיים ב${draft.location} לשימוש (חובה להשתמש רק באלה, לא להמציא): ${realStreets.slice(0,12).join(', ')}`
+  const zoneCount = getZoneCount(draft);
+  const cities = getDraftCities(draft);
+  const perCity = Math.max(4, Math.floor(12 / Math.max(1, cities.length)));
+  const streetsLine = cities.map(c => {
+    const s = getCityStreets(c);
+    return s && s.length ? `\nרחובות אמיתיים ב${c} לשימוש (חובה להשתמש רק באלה, לא להמציא): ${s.slice(0, perCity).join(', ')}` : '';
+  }).join('');
+  const multiCityLine = cities.length > 1
+    ? `\nתרחיש רב-זירתי: הזירות מתפזרות בין היישובים — יש לשייך כל זירה ליישוב שלה בשדה "city", ולוודא שכל יישוב מקבל לפחות זירה אחת.`
     : '';
   // אם נבחרו מיקומים ספציפיים במפה עבור הזירות — הם מחייבים (זירה 1 חייבת להיות במיקום 1 וכו'),
   // במקום שה-AI יבחר מרשימת הרחובות הכללית.
@@ -834,14 +871,14 @@ function buildStoryJsonPrompt(draft) {
     ? `\nמיקומי הזירות נקבעו מראש ואינם לבחירתך — חובה להשתמש בהם בדיוק, לפי הסדר:\n` +
       Array.from({length: zoneCount}, (_, i) => {
         const zl = pickZoneLocation(draft, i+1);
-        return `זירה ${i+1}: רחוב ${zl.street} ${zl.houseNum}`;
+        return `זירה ${i+1}: ${zl.city}, רחוב ${zl.street} ${zl.houseNum}`;
       }).join('\n')
     : '';
   return `אתה מומחה לבניית תרגילי חירום למפקדות נפה של פיקוד העורף בישראל.
 
 בנה סיפור אוכלוסייה מלא ומפורט לתרגיל, עם אוכלוסייה בעלת שם מלא (לא רק מספרים מצטברים):
 • תרחיש: ${scenarioNames[draft.mainScenario]||draft.mainScenario}
-• מיקום: ${draft.location}
+• מיקום: ${cities.join(', ') || draft.location}${multiCityLine}
 • גודל אוכלוסייה: ${draft.populationSize.toLocaleString('he-IL')} תושבים
 • שעת פתיחה: ${draft.startTime}
 • מספר זירות: ${zoneCount}${zoneCount===1 ? ' (נקודת פגיעה יחידה — זירה אחת מורכבת ורוויית אירועים, לא לפצל)' : ''}${zoneLocLine || streetsLine}
@@ -855,7 +892,7 @@ function buildStoryJsonPrompt(draft) {
 6. חובה להשתמש רק ברחובות האמיתיים שצוינו לעיל (אם צוינו).
 
 החזר JSON בלבד, ללא markdown, ללא הסבר, במבנה המדויק הבא:
-{"intro":"תיאור פתיחה כללי","zones":[{"street":"...","houseNum":0,"siteType":"בניין מגורים|מוסד ציבורי|בית פרטי|מפעל / מחסן|מוסד חינוכי|בניין משרדים|כולל / ישיבה","reportTime":"HH:MM","background":"תיאור הרקע בזירה","residents":[{"firstName":"...","lastName":"...","age":0,"floor":1,"apt":1,"role":null,"status":"..."}],"beats":[{"time":"HH:MM","reporter":"...","content":"..."}]}]}`;
+{"intro":"תיאור פתיחה כללי","zones":[{"city":"שם היישוב של הזירה","street":"...","houseNum":0,"siteType":"בניין מגורים|מוסד ציבורי|בית פרטי|מפעל / מחסן|מוסד חינוכי|בניין משרדים|כולל / ישיבה","reportTime":"HH:MM","background":"תיאור הרקע בזירה","residents":[{"firstName":"...","lastName":"...","age":0,"floor":1,"apt":1,"role":null,"status":"..."}],"beats":[{"time":"HH:MM","reporter":"...","content":"..."}]}]}`;
 }
 
 function renderBeatsTableFromTimes(beats) {
@@ -869,6 +906,7 @@ function renderBeatsTableFromTimes(beats) {
 // באותו פורמט (רשימת אוכלוסייה לפי קומה/דירה, טבלת דיווחים) בלי קשר למקור הנתונים.
 function buildStoryFromAIJson(draft, ai) {
   const { location, secondaryScenarios } = draft;
+  const cities = getDraftCities(draft);
   const intro = ai.intro || '';
   const zones = [];
   const summaryRows = [];
@@ -895,16 +933,17 @@ function buildStoryFromAIJson(draft, ai) {
     const beatLines = renderBeatsTableFromTimes(z.beats || []);
     const popAtSite = residents.length;
     const street = z.street || '—', houseNum = z.houseNum || 0;
+    const zoneCity = z.city || pickZoneLocation(draft, idx+1).city || location;
     const siteType = z.siteType || 'בניין מגורים';
     const reportTime = z.reportTime || draft.startTime || '08:00';
 
-    zoneBlocks.push(renderZoneBlock(idx+1, location, street, houseNum, siteType, popAtSite, reportTime,
+    zoneBlocks.push(renderZoneBlock(idx+1, zoneCity, street, houseNum, siteType, popAtSite, reportTime,
       z.background || '', roster, beatLines, killedPeople.length, serious, mod, light, trappedPeople.length));
 
-    summaryRows.push({ z:idx+1, street, houseNum, reportTime, siteType, popAtSite, killed:killedPeople.length, injured:serious+mod+light, trapped:trappedPeople.length });
+    summaryRows.push({ z:idx+1, street, houseNum, city: cities.length>1 ? zoneCity : '', reportTime, siteType, popAtSite, killed:killedPeople.length, injured:serious+mod+light, trapped:trappedPeople.length });
 
     zones.push({
-      z:idx+1, street, houseNum, location, siteType, popAtSite, reportTime,
+      z:idx+1, street, houseNum, location: zoneCity, siteType, popAtSite, reportTime,
       residents, killedPeople, trappedPeople, injuredPeople, missingPeople: resolvedMissing,
       background: z.background || '', beats: z.beats || [],
       finalKilled: killedPeople.length, serious, mod, light, trapped: trappedPeople.length,
@@ -927,23 +966,22 @@ function generatePopulationStory(draft) {
   const m = ({1:.5,2:1,3:2})[complexity]||1;
   const [startH, startM] = (startTime||'08:00').split(':').map(Number);
   const baseMin = startH*60 + startM;
+  const cities = getDraftCities(draft);
+  const locDisplay = cities.length > 1 ? cities.join(', ') : location;
 
   const storyIntros = {
-    earthquake: `ביום האירוע ${location} פעלה בשגרה רגילה. בשעה ${minsToTime(-18,baseMin)} חשו תושבים רעד ראשוני קל. בשעה ${startTime} פגעה רעידת אדמה בעוצמת ${(5+Math.random()).toFixed(1)} ריכטר ברחבי הרשות וגרמה לנזקים במבנים ובתשתיות.`,
-    combat:     `ביום האירוע בשעה ${minsToTime(-12,baseMin)} נשמעה אזעקה ברחבי ${location} בעקבות ירי רקטות. תושבים מיהרו לממ"דים ולמקלטים. בשעה ${startTime} אותרו נקודות פגיעה ישירה ברחבי הרשות.`,
-    mass_cas:   `ביום האירוע בשעה ${startTime} דווח על אירוע רב-נפגעים ב${location}. צוותי חירום גויסו לאתר לטיפול בנפגעים ולחיפוש לכודים.`,
-    fire:       `ביום האירוע בשעה ${startTime} פרצה שריפה נרחבת ב${location}. הרוח הצפה את האש לאזורים נוספים. תושבים פונו משכונות סמוכות.`,
-    flood:      `לאחר גשמים עזים שגרמו לעלייה מהירה בנחלים, בשעה ${startTime} הוצאה התרעת שיטפון ל${location}. כלי רכב ותושבים נלכדו בהצפות.`,
-    chemical:   `בשעה ${startTime} אותרה דליפת חומר מסוכן ב${location}. התפשטות הענן הכימי אילצה פינוי מיידי של אזורים סמוכים.`,
-    traffic:    `בשעה ${startTime} אירעה תאונת דרכים קשה ב${location}. לכודים ונפגעים בשטח — צוותי חירום גויסו למקום.`,
-    infra:      `בשעה ${startTime} קרסה תשתית קריטית ב${location} וגרמה לנזקים נרחבים. צוותי חירום פועלים לשיקום ולסיוע לתושבים.`,
+    earthquake: `ביום האירוע ${locDisplay} פעלה בשגרה רגילה. בשעה ${minsToTime(-18,baseMin)} חשו תושבים רעד ראשוני קל. בשעה ${startTime} פגעה רעידת אדמה בעוצמת ${(5+Math.random()).toFixed(1)} ריכטר ברחבי הרשות וגרמה לנזקים במבנים ובתשתיות.`,
+    combat:     `ביום האירוע בשעה ${minsToTime(-12,baseMin)} נשמעה אזעקה ברחבי ${locDisplay} בעקבות ירי רקטות. תושבים מיהרו לממ"דים ולמקלטים. בשעה ${startTime} אותרו נקודות פגיעה ישירה ברחבי הרשות.`,
+    mass_cas:   `ביום האירוע בשעה ${startTime} דווח על אירוע רב-נפגעים ב${locDisplay}. צוותי חירום גויסו לאתר לטיפול בנפגעים ולחיפוש לכודים.`,
+    fire:       `ביום האירוע בשעה ${startTime} פרצה שריפה נרחבת ב${locDisplay}. הרוח הצפה את האש לאזורים נוספים. תושבים פונו משכונות סמוכות.`,
+    flood:      `לאחר גשמים עזים שגרמו לעלייה מהירה בנחלים, בשעה ${startTime} הוצאה התרעת שיטפון ל${locDisplay}. כלי רכב ותושבים נלכדו בהצפות.`,
+    chemical:   `בשעה ${startTime} אותרה דליפת חומר מסוכן ב${locDisplay}. התפשטות הענן הכימי אילצה פינוי מיידי של אזורים סמוכים.`,
+    traffic:    `בשעה ${startTime} אירעה תאונת דרכים קשה ב${locDisplay}. לכודים ונפגעים בשטח — צוותי חירום גויסו למקום.`,
+    infra:      `בשעה ${startTime} קרסה תשתית קריטית ב${locDisplay} וגרמה לנזקים נרחבים. צוותי חירום פועלים לשיקום ולסיוע לתושבים.`,
   };
   const intro = storyIntros[mainScenario] || storyIntros.earthquake;
 
-  // תרחישים עם נקודת פגיעה יחידה (טק"ק, דליפה, תאונת דרכים) מקבלים זירה אחת מורכבת;
-  // המורכבות מתבטאת בכמות נפגעים/אוכלוסייה בזירה (משתנה m), לא במספר זירות.
-  const SINGLE_SITE = ['combat','chemical','traffic','mass_cas'];
-  const zoneCount = SINGLE_SITE.includes(mainScenario) ? 1 : (({1:1,2:2,3:3})[complexity]||2);
+  const zoneCount = getZoneCount(draft);
   const siteTypes = ['בניין מגורים','מוסד ציבורי','בית פרטי','מפעל / מחסן','מוסד חינוכי','בניין משרדים','כולל / ישיבה'];
 
   // כמה ניסוחים שונים לכל תרחיש (נבחר אקראית לכל זירה) — כדי שכמה זירות באותו תרגיל לא יקבלו
@@ -992,6 +1030,7 @@ function generatePopulationStory(draft) {
     const zoneLoc  = pickZoneLocation(draft, z);
     const street   = zoneLoc.street;
     const houseNum = zoneLoc.houseNum;
+    const zoneCity = zoneLoc.city || location;
     const siteType = pick(siteTypes);
     const floors   = rnd(2,6);
     const popAtSite= rnd(8,35) * Math.max(1,Math.round(m));
@@ -1132,17 +1171,17 @@ function generatePopulationStory(draft) {
     const beatLines = renderBeatsTable(beats, baseMin);
 
     const endTime = minsToTime(Math.min(t, durationHours*60-2), baseMin);
-    summaryRows.push({z, street, houseNum, reportTime, siteType, popAtSite, killed:finalKilled, injured:serious+mod+light, trapped, endTime});
+    summaryRows.push({z, street, houseNum, city: cities.length>1 ? zoneCity : '', reportTime, siteType, popAtSite, killed:finalKilled, injured:serious+mod+light, trapped, endTime});
 
     zones.push({
-      z, street, houseNum, location, siteType, popAtSite, reportTime,
+      z, street, houseNum, location: zoneCity, siteType, popAtSite, reportTime,
       residents, killedPeople, trappedPeople, injuredPeople, missingPeople: resolvedMissing,
       background: bgByScenario(street, houseNum, siteType, popAtSite, floors),
       beats: beats.map(([mins,t,rep]) => ({ time: minsToTime(mins,baseMin), reporter: rep, content: t })),
       finalKilled, serious, mod, light, trapped,
     });
 
-    zonesSections += renderZoneBlock(z, location, street, houseNum, siteType, popAtSite, reportTime,
+    zonesSections += renderZoneBlock(z, zoneCity, street, houseNum, siteType, popAtSite, reportTime,
       bgByScenario(street, houseNum, siteType, popAtSite, floors), roster, beatLines,
       finalKilled, serious, mod, light, trapped);
   }
@@ -1166,9 +1205,11 @@ function generateAnchorList(draft, count=20) {
     'פצוע קל','פצוע בינוני','פצוע קשה',
     'לכוד','הרוג','חולץ',
   ];
+  const anchorCities = getDraftCities(draft);
   const synth = () => {
     const isMale = Math.random() > .45;
     const isMinor = Math.random() < .18;
+    const rowCity = anchorCities.length ? pick(anchorCities) : draft.location;
     return {
       id: uid(),
       idNum: '0' + rnd(10000000,99999999),
@@ -1176,7 +1217,7 @@ function generateAnchorList(draft, count=20) {
       lastName: pick(LAST_NAMES),
       gender: isMale ? 'ז' : 'נ',
       isMinor: isMinor ? 'כן' : 'לא',
-      street: pickStreet(draft.location),
+      street: anchorCities.length > 1 ? `${pickStreet(rowCity)} (${rowCity})` : pickStreet(rowCity),
       houseNum: rnd(1,120),
       entrance: Math.random() > .55 ? pick(['א','ב','ג','ד']) : '',
       apt: rnd(1,40),
@@ -1200,7 +1241,7 @@ function generateAnchorList(draft, count=20) {
           lastName: r.lastName,
           gender: r.gender || (Math.random()>.5?'ז':'נ'),
           isMinor: r.isMinor ? 'כן' : 'לא',
-          street: z.street,
+          street: anchorCities.length > 1 && z.location ? `${z.street} (${z.location})` : z.street,
           houseNum: z.houseNum,
           entrance: r.floor ? pick(['א','ב','ג','ד']) : '',
           apt: r.apt || rnd(1,40),
@@ -1261,6 +1302,7 @@ function emptyDraft() {
     name: '',
     date: today,
     location: '',
+    extraLocations: [],
     zoneLocations: [],
     exerciseType: EXERCISE_TYPES[0],
     complexity: 2,
@@ -1414,7 +1456,7 @@ const TEMPLATE = /* html */`
           <div class="ex-card-top" @click="openExercise(ex)">
             <div class="ex-type-tag">{{ ex.exerciseType }}</div>
             <div class="ex-name">{{ ex.name || '(ללא שם)' }}</div>
-            <div class="ex-location">{{ ex.location || '—' }} &nbsp;·&nbsp; {{ ex.date }}</div>
+            <div class="ex-location">{{ locDisplay(ex) || '—' }} &nbsp;·&nbsp; {{ ex.date }}</div>
           </div>
           <div class="ex-card-mid">
             <div class="ex-stat"><strong>{{ ex.injections.length }}</strong> הזרמות</div>
@@ -1483,6 +1525,19 @@ const TEMPLATE = /* html */`
             </select>
           </div>
         </div>
+        <div class="form-group">
+          <label class="form-label">יישובים נוספים — תרחיש רב-זירתי (אופציונלי)</label>
+          <select class="form-control" style="max-width:340px" :disabled="!draft.location" @change="addExtraLocation($event)">
+            <option value="" selected disabled>{{ draft.location ? 'הוסף יישוב נוסף...' : 'בחר קודם יישוב ראשי' }}</option>
+            <option v-for="c in extraCityOptions" :key="c" :value="c">{{ c }}</option>
+          </select>
+          <div v-if="draft.extraLocations.length" class="chip-grid mt-2">
+            <div v-for="c in draft.extraLocations" :key="c" class="sel-chip selected" @click="removeExtraLocation(c)" title="הסר">
+              {{ c }} ✕
+            </div>
+          </div>
+          <div class="form-hint">בתרחיש רב-זירתי הזירות יתפזרו בין כל היישובים שנבחרו — לפחות זירה אחת לכל יישוב.</div>
+        </div>
         <div class="form-row-3">
           <div class="form-group">
             <label class="form-label">שעת פתיחה</label>
@@ -1521,7 +1576,7 @@ const TEMPLATE = /* html */`
       <div class="wizard-body">
         <div class="story-section-title">מיקומי זירות</div>
         <p class="text-muted mb-4">
-          סמן במפה נקודה או כמה נקודות בתוך {{ draft.location || 'היישוב שנבחר' }} — הזירות שייווצרו בתרגיל ימוקמו בכתובות שנבחרו כאן, לפי הסדר. זהו שלב אופציונלי: אם לא תבחר מיקומים, המערכת תבחר רחובות אקראיים מהיישוב.
+          סמן במפה נקודה או כמה נקודות בתוך {{ draftCities.length > 1 ? 'היישובים שנבחרו ('+draftCities.join(', ')+')' : (draft.location || 'היישוב שנבחר') }} — הזירות שייווצרו בתרגיל ימוקמו בכתובות שנבחרו כאן, לפי הסדר. זהו שלב אופציונלי: אם לא תבחר מיקומים, המערכת תבחר רחובות אקראיים{{ draftCities.length > 1 ? ' ותפזר את הזירות בין היישובים' : ' מהיישוב' }}.
         </p>
 
         <div v-if="settings.govmapToken" class="mb-4">
@@ -1535,6 +1590,12 @@ const TEMPLATE = /* html */`
         </div>
 
         <div class="form-row">
+          <div v-if="draftCities.length > 1" class="form-group">
+            <label class="form-label">יישוב</label>
+            <select v-model="manualCity" class="form-control">
+              <option v-for="c in draftCities" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </div>
           <div class="form-group">
             <label class="form-label">רחוב</label>
             <select v-model="manualStreet" class="form-control">
@@ -1552,10 +1613,10 @@ const TEMPLATE = /* html */`
         </div>
 
         <div v-if="draft.zoneLocations.length>0" class="mt-4">
-          <div class="form-label mb-2">מיקומים שנבחרו ({{ draft.zoneLocations.length }}):</div>
+          <div class="form-label mb-2">מיקומים שנבחרו ({{ draft.zoneLocations.length }}) — ייווצרו {{ draft.zoneLocations.length }} זירות, זירה לכל מיקום:</div>
           <div v-for="(loc,i) in draft.zoneLocations" :key="loc.id" class="zoneloc-row">
             <span class="zoneloc-index">{{ i+1 }}</span>
-            <span class="zoneloc-text">רחוב {{ loc.street }} {{ loc.houseNum }}</span>
+            <span class="zoneloc-text">{{ draftCities.length > 1 && loc.city ? loc.city + ', ' : '' }}רחוב {{ loc.street }} {{ loc.houseNum }}</span>
             <button class="btn btn-ghost btn-sm" @click="removeZoneLocation(loc.id)">✕</button>
           </div>
         </div>
@@ -1806,7 +1867,7 @@ const TEMPLATE = /* html */`
       <div class="detail-type">{{ current.exerciseType }}</div>
       <div class="detail-name">{{ current.name }}</div>
       <div class="detail-meta">
-        <div class="detail-meta-item"><iconify-icon icon="fluent:location-24-regular" aria-hidden="true"></iconify-icon>{{ current.location }}</div>
+        <div class="detail-meta-item"><iconify-icon icon="fluent:location-24-regular" aria-hidden="true"></iconify-icon>{{ locDisplay(current) }}</div>
         <div class="detail-meta-item"><iconify-icon icon="fluent:calendar-24-regular" aria-hidden="true"></iconify-icon>{{ current.date }}</div>
         <div class="detail-meta-item"><iconify-icon icon="fluent:clock-24-regular" aria-hidden="true"></iconify-icon>{{ current.startTime }} ({{ current.durationHours }} שעות)</div>
         <div class="detail-meta-item"><iconify-icon icon="fluent:warning-24-regular" aria-hidden="true"></iconify-icon>{{ scenarioLabel(current.mainScenario) }}</div>
@@ -2015,7 +2076,7 @@ const TEMPLATE = /* html */`
           <div class="story-section">
             <div class="story-section-title">פרטי התרגיל</div>
             <div class="story-text">שם: {{ current.name }}
-תאריך: {{ current.date }}   |   מיקום: {{ current.location }}
+תאריך: {{ current.date }}   |   מיקום: {{ locDisplay(current) }}
 סוג: {{ current.exerciseType }}   |   תרחיש: {{ scenarioLabel(current.mainScenario) }}
 משך: {{ current.durationHours }} שעות החל {{ current.startTime }}
 רמת מורכבות: {{ complexityLabel(current.complexity) }}   |   אוכלוסייה: {{ current.populationSize.toLocaleString('he-IL') }}</div>
@@ -2300,7 +2361,7 @@ async function doExportPPTX(ex, helpers) {
     s.addShape(pptx.shapes.RECTANGLE, { x:0, y:0, w:0.25, h:H, fill:{color:C.amber}, line:{type:'none'} });
     s.addText(ex.exerciseType, { x:0.5, y:0.85, w:7.5, h:0.5, fontSize:13, color:C.lblue, align:'right', rtlMode:true });
     s.addText(ex.name, { x:0.5, y:1.4, w:9.0, h:2.0, fontSize:34, bold:true, color:C.white, align:'right', rtlMode:true, valign:'middle' });
-    s.addText(`${ex.location}   |   ${ex.date}   |   ${ex.startTime}–${endTime}`, { x:0.5, y:3.65, w:9.0, h:0.5, fontSize:13, color:C.lblue, align:'right', rtlMode:true });
+    s.addText(`${locationDisplay(ex)}   |   ${ex.date}   |   ${ex.startTime}–${endTime}`, { x:0.5, y:3.65, w:9.0, h:0.5, fontSize:13, color:C.lblue, align:'right', rtlMode:true });
     s.addText(`${sLabel}   ·   מורכבות: ${cLabel}   ·   ${durationHours} שעות`, { x:0.5, y:4.2, w:9.0, h:0.45, fontSize:12, color:C.white, align:'right', rtlMode:true });
     s.addShape(pptx.shapes.RECTANGLE, { x:0, y:H-0.45, w:W, h:0.45, fill:{color:C.navy2}, line:{type:'none'} });
     s.addText('מחולל תרגילים — מפקדת נפה  |  לשימוש פנימי בלבד', { x:0, y:H-0.45, w:W, h:0.45, fontSize:9, color:C.muted, align:'center', valign:'middle' });
@@ -2315,7 +2376,7 @@ async function doExportPPTX(ex, helpers) {
     const detRows = [
       [{text:'שם התרגיל', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}, {text:ex.name, options:{align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}],
       [{text:'תאריך', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}, {text:ex.date, options:{align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}],
-      [{text:'מיקום / רשות', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}, {text:ex.location, options:{align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}],
+      [{text:'מיקום / רשות', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}, {text:locationDisplay(ex), options:{align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}],
       [{text:'סוג תרגיל', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}, {text:ex.exerciseType, options:{align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}],
       [{text:'תרחיש', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}, {text:sLabel, options:{align:'right',rtlMode:true,fill:{color:C.lgray},fontSize:13}}],
       [{text:'שעות תרגיל', options:{bold:true,align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}, {text:`${ex.startTime}–${endTime} (${durationHours} שעות)`, options:{align:'right',rtlMode:true,fill:{color:C.white},fontSize:13}}],
@@ -2506,6 +2567,7 @@ Vue.createApp({
       wizardSteps: ['פרמטרים','מיקומי זירות','תרחיש','מכלולים','הזרמות','עריכה','אוכלוסייה','ציפיות'],
       manualStreet: '',
       manualHouseNum: 1,
+      manualCity: '',
       govmapLoading: false,
       govmapError: '',
       govmapLoaded: false,
@@ -2535,7 +2597,11 @@ Vue.createApp({
       const p = AI_PROVIDERS.find(x=>x.id===this.settings.provider);
       return p ? p.name : 'AI';
     },
-    cityStreetOptions() { return getCityStreets(this.draft.location) || []; },
+    draftCities() { return getDraftCities(this.draft); },
+    cityStreetOptions() { return getCityStreets(this.manualCity || this.draft.location) || []; },
+    extraCityOptions() {
+      return this.cityList.filter(c => c !== this.draft.location && !this.draft.extraLocations.includes(c));
+    },
     isAuthConfigured() { return !!fbAuth; },
     isAdmin() {
       return !!(this.authUser && (
@@ -2554,11 +2620,22 @@ Vue.createApp({
   },
   watch: {
     'draft.location'(newVal, oldVal) {
-      // מיקומי הזירות (רחובות) שנבחרו שייכים ליישוב הקודם — אם המשתמש חוזר לשלב 1 ומחליף יישוב, הם כבר לא רלוונטיים.
-      if (oldVal && newVal !== oldVal && this.draft.zoneLocations.length) {
-        this.draft.zoneLocations = [];
-        this.toast('מיקומי הזירות אופסו — היישוב הוחלף', 'warning');
-      }
+      if (!oldVal || newVal === oldVal) return;
+      // היישוב החדש לא יכול להופיע גם ברשימת היישובים הנוספים
+      this.draft.extraLocations = this.draft.extraLocations.filter(c => c !== newVal);
+      // מיקומי זירות ששויכו ליישוב הראשי הקודם (או ללא שיוך, מגרסה ישנה) כבר לא רלוונטיים
+      const before = this.draft.zoneLocations.length;
+      this.draft.zoneLocations = this.draft.zoneLocations.filter(l => l.city && l.city !== oldVal);
+      if (before > this.draft.zoneLocations.length) this.toast('מיקומי זירות של היישוב הקודם הוסרו', 'warning');
+      if (this.manualCity === oldVal || !this.manualCity) this.manualCity = newVal;
+    },
+    'draft.extraLocations'(newVal) {
+      // הסרת יישוב נוסף מסירה גם את מיקומי הזירות ששויכו אליו
+      const valid = [this.draft.location, ...newVal];
+      const before = this.draft.zoneLocations.length;
+      this.draft.zoneLocations = this.draft.zoneLocations.filter(l => !l.city || valid.includes(l.city));
+      if (before > this.draft.zoneLocations.length) this.toast('מיקומי זירות של יישוב שהוסר נמחקו', 'warning');
+      if (this.manualCity && !valid.includes(this.manualCity)) this.manualCity = this.draft.location;
     },
   },
   methods: {
@@ -2650,7 +2727,7 @@ Vue.createApp({
 
     startNew() {
       this.draft = emptyDraft(); this.step = 1; this.editingInjId = null; this.view = 'wizard';
-      this.govmapMap = null; this.govmapError = ''; this.manualStreet = ''; this.manualHouseNum = 1;
+      this.govmapMap = null; this.govmapError = ''; this.manualStreet = ''; this.manualHouseNum = 1; this.manualCity = '';
     },
     toggleSec(id) {
       const idx = this.draft.secondaryScenarios.indexOf(id);
@@ -2664,18 +2741,35 @@ Vue.createApp({
     },
     nextStep() {
       if (this.step < 8) this.step++;
-      if (this.step === 2) this.$nextTick(() => this.initGovMap());
+      if (this.step === 2) {
+        if (!this.manualCity || !getDraftCities(this.draft).includes(this.manualCity)) this.manualCity = this.draft.location;
+        this.$nextTick(() => this.initGovMap());
+      }
+    },
+    locDisplay(ex) { return locationDisplay(ex); },
+    addExtraLocation(e) {
+      const c = e.target.value;
+      e.target.value = '';
+      if (!c || c === this.draft.location || this.draft.extraLocations.includes(c)) return;
+      this.draft.extraLocations.push(c);
+    },
+    removeExtraLocation(c) {
+      this.draft.extraLocations = this.draft.extraLocations.filter(x => x !== c);
     },
     addManualZoneLocation() {
       if (!this.manualStreet) return;
       this.draft.zoneLocations.push({
-        id: uid(), street: this.manualStreet, houseNum: this.manualHouseNum || 1, address: '', x: null, y: null,
+        id: uid(), city: this.manualCity || this.draft.location,
+        street: this.manualStreet, houseNum: this.manualHouseNum || 1, address: '', x: null, y: null,
       });
       this.manualStreet = '';
       this.manualHouseNum = 1;
     },
     addZoneLocationFromMap(street, houseNum, address, x, y) {
-      this.draft.zoneLocations.push({ id: uid(), street, houseNum, address, x, y });
+      // בלחיצה על מפה: משייכים את הנקודה ליישוב שנבחר שמופיע בכתובת שה-geocode החזיר; אחרת ליישוב הראשי
+      const cities = getDraftCities(this.draft);
+      const city = cities.find(c => String(address).includes(c)) || this.draft.location;
+      this.draft.zoneLocations.push({ id: uid(), city, street, houseNum, address, x, y });
       if (this.govmapMap) {
         try { this.govmapMap.setMapMarker({ x, y, iconType: 'circle' }); } catch (e) { /* marker is a visual aid only */ }
       }
@@ -2833,7 +2927,7 @@ Vue.createApp({
       // Sheet 1 — לוח הזרמות לתרגיל (3 cols, matches real drill-day format)
       const drillRows = [
         [`תרגיל: ${ex.name}`, '', ''],
-        [`תאריך: ${ex.date}  |  מיקום: ${ex.location}  |  ${ex.startTime}–${this.endTime}`, '', ''],
+        [`תאריך: ${ex.date}  |  מיקום: ${locationDisplay(ex)}  |  ${ex.startTime}–${this.endTime}`, '', ''],
         ['', '', ''],
         ['שעה', 'דיווח', 'גורם מדווח'],
       ];
@@ -2922,7 +3016,7 @@ Vue.createApp({
         new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:0}, children:[txt('לשימוש תרגיל בלבד — מסמך סינתטי, אינו מבצעי',{bold:true,size:16,color:COL.muted})] }),
         new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{before:600,after:200}, children:[txt('תיק תרגיל',{bold:true,size:56,color:COL.primary})] }),
         new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:300}, border:{bottom:{style:BorderStyle.SINGLE,size:12,color:COL.primary}}, children:[txt(ex.name,{size:32,color:COL.dark})] }),
-        new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:80}, children:[txt(`${ex.location}  ·  ${ex.date}  ·  ${ex.startTime}–${this.endTime}`,{size:22,color:COL.muted})] }),
+        new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:80}, children:[txt(`${locationDisplay(ex)}  ·  ${ex.date}  ·  ${ex.startTime}–${this.endTime}`,{size:22,color:COL.muted})] }),
         new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:80}, children:[txt(`${ex.exerciseType}  ·  ${this.scenarioLabel(ex.mainScenario)}`,{size:22,color:COL.muted})] }),
         new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, spacing:{after:600}, children:[txt(`${this.complexityLabel(ex.complexity)}  ·  ${ex.populationSize.toLocaleString('he-IL')} תושבים`,{size:22,color:COL.muted})] }),
         new Paragraph({ bidirectional:true, alignment:AlignmentType.CENTER, children:[txt(`הופק: ${new Date().toLocaleDateString('he-IL')}  |  מחולל תרגילים — מפקדת נפה`,{size:16,color:COL.muted})] }),
@@ -2932,7 +3026,7 @@ Vue.createApp({
       children.push(sectionHeading('1. פרטי התרגיל'));
       children.push(table([
         row([cell('שם התרגיל',{bold:true,width:1800}), cell(ex.name,{width:3200}), cell('תאריך',{bold:true,width:1400}), cell(ex.date,{width:2600})]),
-        row([cell('מיקום / רשות',{bold:true,width:1800}), cell(ex.location,{width:3200}), cell('סוג תרגיל',{bold:true,width:1400}), cell(ex.exerciseType,{width:2600})]),
+        row([cell('מיקום / רשות',{bold:true,width:1800}), cell(locationDisplay(ex),{width:3200}), cell('סוג תרגיל',{bold:true,width:1400}), cell(ex.exerciseType,{width:2600})]),
         row([cell('תרחיש ראשי',{bold:true,width:1800}), cell(this.scenarioLabel(ex.mainScenario),{width:3200}), cell('תרחישים משניים',{bold:true,width:1400}), cell(secNames,{width:2600})]),
         row([cell('שעות תרגיל',{bold:true,width:1800}), cell(`${ex.startTime}–${this.endTime} (${ex.durationHours} שעות)`,{width:3200}), cell('מורכבות',{bold:true,width:1400}), cell(this.complexityLabel(ex.complexity),{width:2600})]),
         row([cell('גודל אוכלוסייה',{bold:true,width:1800}), cell(`${ex.populationSize.toLocaleString('he-IL')} תושבים`,{width:3200}), cell('מכלולים',{bold:true,width:1400}), cell(unitNames,{width:2600})]),
@@ -2950,8 +3044,8 @@ Vue.createApp({
       if (ex.populationZones && ex.populationZones.length) {
         children.push(...preBlock(ex.populationIntro || ''));
         ex.populationZones.forEach(z => {
-          children.push(subHeading(`זירה ${z.z} – ${ex.location}, רחוב ${z.street} ${z.houseNum}`));
-          children.push(metaLine('מיקום', `רחוב ${z.street} ${z.houseNum}`));
+          children.push(subHeading(`זירה ${z.z} – ${z.location || ex.location}, רחוב ${z.street} ${z.houseNum}`));
+          children.push(metaLine('מיקום', `${z.location ? z.location+', ' : ''}רחוב ${z.street} ${z.houseNum}`));
           children.push(metaLine('שעת דיווח על נפילה', z.reportTime));
           children.push(metaLine('סוג אתר', z.siteType));
 
