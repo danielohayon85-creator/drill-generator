@@ -143,6 +143,24 @@ function loadSettings() {
 }
 function saveSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
 
+/* ── Exercise API — סנכרון תרגילים מול השרת (server.py, ראה API.md) ── */
+// כשהאפליקציה נפתחת ישירות מקובץ (file://) אין שרת — עובדים על localStorage בלבד.
+const EXERCISE_API_BASE = /^https?:$/.test(location.protocol) ? '' : null;
+
+async function exerciseApi(path, options = {}) {
+  if (EXERCISE_API_BASE === null) throw new Error('API unavailable');
+  const res = await fetch(EXERCISE_API_BASE + '/api' + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    let msg = `API error ${res.status}`;
+    try { msg = (await res.json()).error || msg; } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
 const AI_PROVIDERS = [
   { id:'anthropic', name:'Claude (Anthropic)', placeholder:'sk-ant-api03-...' },
   { id:'openai',     name:'OpenAI (GPT)',       placeholder:'sk-...' },
@@ -2533,6 +2551,7 @@ Vue.createApp({
     return {
       view: 'home',
       exercises: [],
+      apiOnline: false,
       step: 1,
       draft: emptyDraft(),
       editingInjId: null,
@@ -3204,10 +3223,42 @@ Vue.createApp({
     },
 
     saveSettingsData() { saveSettings(this.settings); this.showSettings = false; this.toast('הגדרות נשמרו','success'); },
-    saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(this.exercises)); },
+    saveData() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.exercises));
+      this.syncToServer();
+    },
     loadData() {
       try { const d = localStorage.getItem(STORAGE_KEY); if(d) this.exercises = JSON.parse(d); }
       catch(e) { console.warn('Could not load saved data'); }
+    },
+    // סנכרון מלא לשרת (fire-and-forget) — localStorage נשאר מקור זמין תמיד
+    async syncToServer() {
+      if (!this.apiOnline) return;
+      try {
+        await exerciseApi('/exercises/sync', {
+          method: 'POST',
+          body: JSON.stringify({ exercises: this.exercises, replace: true }),
+        });
+      } catch(e) {
+        console.warn('Exercise API sync failed:', e.message);
+        this.apiOnline = false;
+      }
+    },
+    // טעינה מהשרת בעליית האפליקציה; אם השרת ריק ויש נתונים מקומיים — מעלים אותם אליו
+    async loadFromServer() {
+      try {
+        const data = await exerciseApi('/exercises');
+        this.apiOnline = true;
+        const serverList = data.exercises || [];
+        if (serverList.length === 0 && this.exercises.length > 0) {
+          await this.syncToServer();
+        } else if (serverList.length > 0) {
+          this.exercises = serverList;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(serverList));
+        }
+      } catch(e) {
+        this.apiOnline = false;
+      }
     },
     toast(msg, type='success') {
       const id = uid();
@@ -3239,6 +3290,7 @@ Vue.createApp({
   },
   mounted() {
     this.loadData();
+    this.loadFromServer();
     loadStreetsData().then(data => {
       this.cityList = Object.keys(data || {}).sort((a,b) => a.localeCompare(b, 'he'));
     });
