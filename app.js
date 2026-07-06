@@ -826,6 +826,17 @@ ${beatLines}
 `;
 }
 
+// שורות שמתחילות בתו "חלש" (שעה 08:00, קווי ─── , •) מקבלות כיוון שמאל-לימין כשמדביקים
+// את הטקסט בוורד/מייל/פנקס רשימות. סימן RTL בלתי-נראה (U+200F) בתחילת כל שורה כזו קובע
+// כיוון ימין-לשמאל בכל יישום, בלי לשנות את מראה הטקסט.
+const RLM = '\u200F';
+function forceRtlLines(text) {
+  return String(text || '').split('\n').map(l => {
+    if (!l.trim() || l.startsWith(RLM)) return l;
+    return /^[\u0590-\u05FF]/.test(l.trimStart()) ? l : RLM + l;
+  }).join('\n');
+}
+
 // בונה את מעטפת הסיפור המלאה (כללי + זירות + טבלת סיכום) — משותף לשני מקורות הנתונים
 function renderFullStory(draft, intro, zoneBlocks, summaryRows, severity, secText) {
   const { populationSize, durationHours, complexity } = draft;
@@ -839,7 +850,7 @@ function renderFullStory(draft, intro, zoneBlocks, summaryRows, severity, secTex
   const totTrapped = summaryRows.reduce((s,r)=>s+r.trapped,0);
   const summaryFooter = `${'─'.repeat(80)}\nסה"כ: ${totKilled} הרוגים | ${totInjured} פצועים (${severity.serious} קשים / ${severity.mod} בינוניים / ${severity.light} קלים) | ${totTrapped} לכודים (חולצו) | 0 נעדרים`;
 
-  return `══════════════════════════════════════════════
+  return forceRtlLines(`══════════════════════════════════════════════
 סיפור כללי
 ══════════════════════════════════════════════
 ${intro}
@@ -859,7 +870,7 @@ ${summaryHeader}
 ${summaryBody}
 ${summaryFooter}
 
-משך התרגיל: ${durationHours} שעות | רמת מורכבות: ${{1:'קלה',2:'בינונית',3:'גבוהה'}[complexity]}`;
+משך התרגיל: ${durationHours} שעות | רמת מורכבות: ${{1:'קלה',2:'בינונית',3:'גבוהה'}[complexity]}`);
 }
 
 function buildStoryJsonPrompt(draft) {
@@ -1479,6 +1490,7 @@ const TEMPLATE = /* html */`
           </div>
           <div class="ex-card-actions">
             <button class="btn btn-secondary btn-sm" @click="duplicateExercise(ex.id)">שכפל</button>
+            <button class="btn btn-secondary btn-sm" @click="editExercise(ex)">ערוך</button>
             <button class="btn btn-danger btn-sm" @click="confirmDelete(ex.id)">מחק</button>
             <button class="btn btn-primary btn-sm" @click="openExercise(ex)">פתח ←</button>
           </div>
@@ -1491,7 +1503,7 @@ const TEMPLATE = /* html */`
   <div v-else-if="view==='wizard'" class="page-wrap">
     <div class="page-header">
       <button class="back-btn" @click="confirmLeaveWizard">← יציאה</button>
-      <span class="page-title">יצירת תרגיל חדש</span>
+      <span class="page-title">{{ isEditingExisting ? 'עריכת תרגיל — ' + (draft.name || '') : 'יצירת תרגיל חדש' }}</span>
     </div>
     <!-- Progress -->
     <div class="progress-wrap">
@@ -1734,10 +1746,13 @@ const TEMPLATE = /* html */`
       </div>
       <div class="wizard-footer">
         <button class="btn btn-secondary" @click="step--">← חזרה</button>
-        <button class="btn btn-primary" @click="runGenerate">
-          <span v-if="settings.apiKey && settings.useApi">צור עם AI ←</span>
-          <span v-else>צור הזרמות ←</span>
-        </button>
+        <div style="display:flex;gap:8px">
+          <button v-if="draft.injections.length" class="btn btn-secondary" @click="step=6">המשך ללא יצירה מחדש ←</button>
+          <button class="btn btn-primary" @click="runGenerate">
+            <span v-if="draft.injections.length">{{ settings.apiKey && settings.useApi ? 'צור מחדש עם AI ←' : 'צור הזרמות מחדש ←' }}</span>
+            <span v-else>{{ settings.apiKey && settings.useApi ? 'צור עם AI ←' : 'צור הזרמות ←' }}</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1879,6 +1894,9 @@ const TEMPLATE = /* html */`
       <button class="back-btn" @click="view='exercises'">← חזרה לרשימה</button>
       <span class="page-title" style="flex:1">{{ current.name }}</span>
       <div class="btn-group">
+        <button class="btn btn-primary btn-sm" @click="editExercise()">
+          <iconify-icon icon="fluent:edit-24-regular" aria-hidden="true"></iconify-icon> ערוך
+        </button>
         <button class="btn btn-secondary btn-sm" @click="exportCSV">CSV</button>
         <button class="btn btn-secondary btn-sm" @click="exportWord">Word</button>
         <button class="btn btn-ghost btn-sm" @click="window.print()">הדפסה</button>
@@ -2618,6 +2636,7 @@ Vue.createApp({
       return p ? p.name : 'AI';
     },
     draftCities() { return getDraftCities(this.draft); },
+    isEditingExisting() { return this.exercises.some(e => e.id === this.draft.id); },
     cityStreetOptions() { return getCityStreets(this.manualCity || this.draft.location) || []; },
     extraCityOptions() {
       return this.cityList.filter(c => c !== this.draft.location && !this.draft.extraLocations.includes(c));
@@ -2898,6 +2917,16 @@ Vue.createApp({
       logActivity('created_exercise', { name: ex.name, location: ex.location });
     },
     openExercise(ex) { this.current = JSON.parse(JSON.stringify(ex)); this.detailTab = 'injections'; this.view = 'detail'; },
+    // פתיחת תרגיל שמור בחזרה באשף — כל הנתונים ניתנים לעריכה וליצירה מחדש; שמירה מעדכנת את אותו תרגיל (לפי id)
+    editExercise(ex) {
+      const d = JSON.parse(JSON.stringify(ex || this.current));
+      const base = emptyDraft();
+      for (const k of Object.keys(base)) if (d[k] === undefined) d[k] = base[k]; // תרגילים ישנים ללא שדות חדשים
+      this.draft = d;
+      this.step = 1; this.editingInjId = null; this.view = 'wizard';
+      this._gmap = null; this._gmapGeocoder = null; this._gmapMarkers = {}; this.gmapError = '';
+      this.manualStreet = ''; this.manualHouseNum = 1; this.manualCity = d.location || '';
+    },
     confirmLeaveWizard() { if (confirm('לצאת מהאשף? ההתקדמות לא תישמר.')) this.view = 'home'; },
     confirmDelete(id) { this.deleteTargetId = id; this.showDeleteModal = true; },
     doDelete() {
@@ -2918,7 +2947,28 @@ Vue.createApp({
     },
 
     // Generate helpers (exposed to template)
-    regenerateStory() {
+    // יצירת סיפור אוכלוסייה מחדש — עם AI כשמופעל (כמו ביצירה הראשונית), אחרת תבניות
+    async regenerateStory() {
+      const settings = loadSettings();
+      const useApi = !!(settings.apiKey && settings.useApi);
+      if (useApi) {
+        this.apiLoading = 'מייצר סיפור אוכלוסייה עם AI...';
+        try {
+          const raw = await callAI(settings.provider || 'anthropic', settings.apiKey, buildStoryJsonPrompt(this.draft), 12000);
+          const parsed = extractJsonFromAI(raw);
+          if (!parsed || !Array.isArray(parsed.zones) || !parsed.zones.length) throw new Error('תשובת ה-AI לא הכילה זירות תקינות');
+          const { text, zones, intro } = buildStoryFromAIJson(this.draft, parsed);
+          this.draft.populationStory = text;
+          this.draft.populationZones = zones;
+          this.draft.populationIntro = intro;
+          this.toast('סיפור אוכלוסייה נוצר מחדש עם AI', 'success');
+          return;
+        } catch(e) {
+          this.toast(`שגיאת API — עובר לתבניות: ${e.message}`, 'warning');
+        } finally {
+          this.apiLoading = '';
+        }
+      }
       const { text, zones, intro } = generatePopulationStory(this.draft);
       this.draft.populationStory = text;
       this.draft.populationZones = zones;
@@ -2992,10 +3042,10 @@ Vue.createApp({
       if (!this.draft.anchorList.length) this.draft.anchorList = generateAnchorList(this.draft, this.draft.anchorCount||20);
       if (!this.draft.unitExpectations.length) this.draft.unitExpectations = generateExpectations(this.draft);
       if (!this.draft.mentorHighlights) {
-        this.draft.mentorHighlights = `• ודא שהמשתתפים קולטים הזרמות בזמן ומגיבים בהתאם.\n• הדגש ניהול תמונת מצב מתעדכנת.\n• וודא שמתבצע תיאום בין-מכלולי מול כל אירוע.`;
+        this.draft.mentorHighlights = forceRtlLines(`• ודא שהמשתתפים קולטים הזרמות בזמן ומגיבים בהתאם.\n• הדגש ניהול תמונת מצב מתעדכנת.\n• וודא שמתבצע תיאום בין-מכלולי מול כל אירוע.`);
       }
       if (!this.draft.controllerHighlights) {
-        this.draft.controllerHighlights = `• בדוק: האם הצוות מדווח ב-${Math.round(this.draft.durationHours*60/this.draft.injCount)} דקות לכל הזרמה?\n• בדוק: תיאום — האם גורמים משתתפים מתואמים?\n• בדוק: האם יומן האירוע מתועד כראוי?`;
+        this.draft.controllerHighlights = forceRtlLines(`• בדוק: האם הצוות מדווח ב-${Math.round(this.draft.durationHours*60/this.draft.injCount)} דקות לכל הזרמה?\n• בדוק: תיאום — האם גורמים משתתפים מתואמים?\n• בדוק: האם יומן האירוע מתועד כראוי?`);
       }
       this.step = 6;
     },
