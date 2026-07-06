@@ -1607,9 +1607,18 @@ const TEMPLATE = /* html */`
             <label class="form-label">מספר בית</label>
             <input v-model.number="manualHouseNum" type="number" class="form-control" min="1" max="300" />
           </div>
-          <div class="form-group" style="justify-content:flex-end;display:flex">
+          <div class="form-group" style="justify-content:flex-end;display:flex;gap:8px">
             <button class="btn btn-secondary" @click="addManualZoneLocation" :disabled="!manualStreet">הוסף מיקום</button>
+            <button class="btn btn-secondary" @click="addRandomZoneLocation" :disabled="!cityStreetOptions.length" title="הגרלת רחוב ומספר בית אקראיים מהיישוב שנבחר">
+              <iconify-icon icon="fluent:arrow-shuffle-24-regular" aria-hidden="true"></iconify-icon> מיקום אקראי
+            </button>
           </div>
+        </div>
+        <div v-if="draftCities.length>1" style="margin-top:4px">
+          <button class="btn btn-ghost btn-sm" @click="addRandomZoneLocationAllCities">
+            <iconify-icon icon="fluent:arrow-shuffle-24-regular" aria-hidden="true"></iconify-icon>
+            הגרל מיקום אקראי בכל יישוב ({{ draftCities.length }} מיקומים בבת אחת)
+          </button>
         </div>
 
         <div v-if="draft.zoneLocations.length>0" class="mt-4">
@@ -2764,6 +2773,27 @@ Vue.createApp({
       });
       this.manualStreet = '';
       this.manualHouseNum = 1;
+    },
+    // הגרלת מיקום זירה: רחוב אקראי מרשימת הרחובות האמיתית של היישוב + מספר בית אקראי,
+    // עם ניסיון להימנע מרחוב שכבר נבחר לאותו יישוב
+    pushRandomZoneLocation(city) {
+      const streets = getCityStreets(city);
+      if (!streets || !streets.length) return false;
+      let street = pick(streets);
+      for (let i = 0; i < 8 && this.draft.zoneLocations.some(l => l.street === street && (l.city || this.draft.location) === city); i++) {
+        street = pick(streets);
+      }
+      this.draft.zoneLocations.push({ id: uid(), city, street, houseNum: rnd(1, 120), address: '', x: null, y: null });
+      return true;
+    },
+    addRandomZoneLocation() {
+      const city = this.manualCity || this.draft.location;
+      if (!this.pushRandomZoneLocation(city)) this.toast('אין רשימת רחובות ליישוב זה', 'warning');
+    },
+    addRandomZoneLocationAllCities() {
+      const added = getDraftCities(this.draft).filter(c => this.pushRandomZoneLocation(c)).length;
+      if (added) this.toast(`הוגרלו ${added} מיקומים — אחד בכל יישוב`, 'success');
+      else this.toast('אין רשימות רחובות ליישובים שנבחרו', 'warning');
     },
     addZoneLocationFromMap(street, houseNum, address, x, y) {
       // בלחיצה על מפה: משייכים את הנקודה ליישוב שנבחר שמופיע בכתובת שה-geocode החזיר; אחרת ליישוב הראשי
