@@ -212,7 +212,11 @@ async function callOpenAI(apiKey, prompt, maxTokens) {
     },
     body: JSON.stringify({
       model: 'gpt-5',
-      max_completion_tokens: maxTokens,
+      // GPT-5 הוא מודל חשיבה: טוקני החשיבה הסמויים נספרים בתוך max_completion_tokens,
+      // ולכן תקציב קטן מדי מסתיים לפני שנכתבת תשובה בכלל (content ריק, finish_reason=length).
+      // חשיבה מינימלית + תקציב גבוה פותרים זאת; משלמים רק על טוקנים שנוצרו בפועל.
+      reasoning_effort: 'minimal',
+      max_completion_tokens: Math.max(maxTokens * 4, 16000),
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -221,7 +225,14 @@ async function callOpenAI(apiKey, prompt, maxTokens) {
     throw new Error(err.error?.message || `שגיאת API: ${res.status}`);
   }
   const data = await res.json();
-  return data.choices[0].message.content;
+  const choice = data.choices && data.choices[0];
+  const content = choice?.message?.content || '';
+  if (!content.trim()) {
+    throw new Error(choice?.finish_reason === 'length'
+      ? 'GPT סיים את תקציב הטוקנים לפני שכתב תשובה — נסה שוב'
+      : 'GPT החזיר תשובה ריקה');
+  }
+  return content;
 }
 
 async function callGemini(apiKey, prompt, maxTokens) {
