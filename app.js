@@ -2828,7 +2828,7 @@ Vue.createApp({
       this._gmapGeocoder.geocode({ address: city + ', ישראל', region: 'IL' }, (results, status) => {
         if (status === 'OK' && results && results[0]) {
           this._gmap.setCenter(results[0].geometry.location);
-          this._gmap.setZoom(14);
+          this._gmap.setZoom(16); // קרוב מספיק כדי להבחין בבניינים בתצוגת לוויין
         }
       });
     },
@@ -2859,7 +2859,9 @@ Vue.createApp({
         // המפה נבנית מחדש בכל כניסה לשלב — ה-DOM של השלב נהרס ביציאה (v-if)
         const map = new google.maps.Map(container, {
           center: { lat: 31.78, lng: 35.0 }, zoom: 8,
-          mapTypeControl: false, streetViewControl: false,
+          mapTypeId: 'hybrid', // לוויין + שמות רחובות — רואים בניינים ותצורת שטח
+          mapTypeControl: true, streetViewControl: false,
+          mapTypeControlOptions: { position: 3 /* TOP_LEFT */ },
         });
         this._gmap = map;
         this._gmapGeocoder = new google.maps.Geocoder();
