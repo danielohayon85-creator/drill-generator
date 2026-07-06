@@ -421,21 +421,23 @@ function loadStreetsData() {
 }
 
 /* ═══════════════════════════════════════════════════
-   GOVMAP — טעינת ה-API הרשמי של govmap.gov.il לבחירת מיקומי זירות
+   GOOGLE MAPS — טעינת Maps JavaScript API לבחירת מיקומי זירות
 ═══════════════════════════════════════════════════ */
-let _govmapScriptPromise = null;
-function loadGovMapScript() {
-  if (typeof govmap !== 'undefined') return Promise.resolve();
-  if (!_govmapScriptPromise) {
-    _govmapScriptPromise = new Promise((resolve, reject) => {
+let _gmapsScriptPromise = null;
+function loadGoogleMapsScript(apiKey) {
+  if (typeof google !== 'undefined' && google.maps && google.maps.Map) return Promise.resolve();
+  if (!_gmapsScriptPromise) {
+    _gmapsScriptPromise = new Promise((resolve, reject) => {
+      // callback גלובלי — הדרך הנתמכת לדעת שה-API סיים אתחול (לא רק שהקובץ נטען)
+      window.__gmapsReady = () => resolve();
       const s = document.createElement('script');
-      s.src = 'https://www.govmap.gov.il/govmap/api/govmap.api.js';
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error('טעינת סקריפט GovMap נכשלה'));
+      s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&language=he&region=IL&callback=__gmapsReady`;
+      s.async = true;
+      s.onerror = () => { _gmapsScriptPromise = null; reject(new Error('טעינת סקריפט Google Maps נכשלה')); };
       document.head.appendChild(s);
     });
   }
-  return _govmapScriptPromise;
+  return _gmapsScriptPromise;
 }
 
 function getCityStreets(location) {
@@ -1579,14 +1581,14 @@ const TEMPLATE = /* html */`
           סמן במפה נקודה או כמה נקודות בתוך {{ draftCities.length > 1 ? 'היישובים שנבחרו ('+draftCities.join(', ')+')' : (draft.location || 'היישוב שנבחר') }} — הזירות שייווצרו בתרגיל ימוקמו בכתובות שנבחרו כאן, לפי הסדר. זהו שלב אופציונלי: אם לא תבחר מיקומים, המערכת תבחר רחובות אקראיים{{ draftCities.length > 1 ? ' ותפזר את הזירות בין היישובים' : ' מהיישוב' }}.
         </p>
 
-        <div v-if="settings.govmapToken" class="mb-4">
-          <div id="govmap-container" class="govmap-canvas"></div>
-          <div v-if="govmapLoading" class="info-box mt-2"><span>טוען מפה...</span></div>
-          <div v-if="govmapError" class="warn-box mt-2"><span>{{ govmapError }} — אפשר להוסיף מיקומים ידנית ברשימה למטה.</span></div>
-          <div class="form-hint mt-2" v-if="!govmapLoading && !govmapError">לחיצה על המפה מוסיפה סימון זירה בנקודה שנבחרה.</div>
+        <div v-if="settings.googleMapsKey" class="mb-4">
+          <div id="gmap-container" class="map-canvas"></div>
+          <div v-if="gmapLoading" class="info-box mt-2"><span>טוען מפה...</span></div>
+          <div v-if="gmapError" class="warn-box mt-2"><span>{{ gmapError }} — אפשר להוסיף מיקומים ידנית ברשימה למטה.</span></div>
+          <div class="form-hint mt-2" v-if="!gmapLoading && !gmapError">לחיצה על המפה מוסיפה סימון זירה בנקודה שנבחרה. החלפת יישוב בבורר למטה תמרכז את המפה עליו.</div>
         </div>
         <div v-else class="info-box mb-4">
-          <span>לא הוגדר טוקן GovMap — ניתן להגדיר ב<a href="#" @click.prevent="showSettings=true">הגדרות API</a> כדי לבחור מיקומים על מפה אינטראקטיבית. בינתיים אפשר להוסיף מיקומי זירות ידנית מרשימת הרחובות של היישוב:</span>
+          <span>לא הוגדר מפתח Google Maps — ניתן להגדיר ב<a href="#" @click.prevent="showSettings=true">הגדרות API</a> כדי לבחור מיקומים על מפה אינטראקטיבית. בינתיים אפשר להוסיף מיקומי זירות ידנית מרשימת הרחובות של היישוב:</span>
         </div>
 
         <div class="form-row">
@@ -2141,13 +2143,12 @@ const TEMPLATE = /* html */`
         </div>
         <div class="divider mt-4 mb-4"></div>
         <div class="form-group">
-          <label class="form-label">GovMap API Token (לבחירת מיקומי זירות על המפה)</label>
-          <input v-model="settings.govmapToken" class="form-control" placeholder="הדבק כאן טוקן שהתקבל מ-govmap.gov.il" style="direction:ltr;letter-spacing:.05em" />
+          <label class="form-label">מפתח Google Maps (לבחירת מיקומי זירות על המפה)</label>
+          <input v-model="settings.googleMapsKey" class="form-control" placeholder="AIza..." style="direction:ltr;letter-spacing:.05em" />
           <div class="form-hint">
-            נרשמים חינם בכתובת
-            <a href="https://api.govmap.gov.il/docs/intro/" target="_blank" rel="noopener">api.govmap.gov.il</a>
-            — הטוקן נעול לדומיין הרשום, כך שיש להירשם בנפרד לכתובת הפיתוח המקומית (localhost) ולכתובת האתר הציבורי.
-            ללא טוקן ניתן עדיין להוסיף מיקומי זירות ידנית מרשימת הרחובות של היישוב.
+            יוצרים מפתח ב-<a href="https://console.cloud.google.com/google/maps-apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>
+            (נדרש להפעיל את Maps JavaScript API ואת Geocoding API באותו פרויקט).
+            מומלץ להגביל את המפתח לדומיין האתר. ללא מפתח ניתן עדיין להוסיף מיקומי זירות ידנית או בהגרלה מרשימת הרחובות.
           </div>
         </div>
       </div>
@@ -2577,10 +2578,9 @@ Vue.createApp({
       manualStreet: '',
       manualHouseNum: 1,
       manualCity: '',
-      govmapLoading: false,
-      govmapError: '',
-      govmapLoaded: false,
-      govmapMap: null,
+      gmapLoading: false,
+      gmapError: '',
+      gmap: null,
     };
   },
   computed: {
@@ -2645,6 +2645,10 @@ Vue.createApp({
       this.draft.zoneLocations = this.draft.zoneLocations.filter(l => !l.city || valid.includes(l.city));
       if (before > this.draft.zoneLocations.length) this.toast('מיקומי זירות של יישוב שהוסר נמחקו', 'warning');
       if (this.manualCity && !valid.includes(this.manualCity)) this.manualCity = this.draft.location;
+    },
+    manualCity(newVal) {
+      // החלפת יישוב בבורר בשלב מיקומי הזירות ממרכזת את המפה על היישוב
+      if (this.step === 2 && newVal) this.centerMapOnCity(newVal);
     },
   },
   methods: {
@@ -2736,7 +2740,8 @@ Vue.createApp({
 
     startNew() {
       this.draft = emptyDraft(); this.step = 1; this.editingInjId = null; this.view = 'wizard';
-      this.govmapMap = null; this.govmapError = ''; this.manualStreet = ''; this.manualHouseNum = 1; this.manualCity = '';
+      this._gmap = null; this._gmapGeocoder = null; this._gmapMarkers = {}; this.gmapError = '';
+      this.manualStreet = ''; this.manualHouseNum = 1; this.manualCity = '';
     },
     toggleSec(id) {
       const idx = this.draft.secondaryScenarios.indexOf(id);
@@ -2752,7 +2757,7 @@ Vue.createApp({
       if (this.step < 8) this.step++;
       if (this.step === 2) {
         if (!this.manualCity || !getDraftCities(this.draft).includes(this.manualCity)) this.manualCity = this.draft.location;
-        this.$nextTick(() => this.initGovMap());
+        this.$nextTick(() => this.initGoogleMap());
       }
     },
     locDisplay(ex) { return locationDisplay(ex); },
@@ -2795,45 +2800,77 @@ Vue.createApp({
       if (added) this.toast(`הוגרלו ${added} מיקומים — אחד בכל יישוב`, 'success');
       else this.toast('אין רשימות רחובות ליישובים שנבחרו', 'warning');
     },
-    addZoneLocationFromMap(street, houseNum, address, x, y) {
-      // בלחיצה על מפה: משייכים את הנקודה ליישוב שנבחר שמופיע בכתובת שה-geocode החזיר; אחרת ליישוב הראשי
+    addZoneLocationFromMap(street, houseNum, address, x, y, cityName) {
+      // בלחיצה על מפה: משייכים את הנקודה ליישוב שנבחר לפי היישוב שה-geocode זיהה; אחרת ליישוב הראשי
       const cities = getDraftCities(this.draft);
-      const city = cities.find(c => String(address).includes(c)) || this.draft.location;
-      this.draft.zoneLocations.push({ id: uid(), city, street, houseNum, address, x, y });
-      if (this.govmapMap) {
-        try { this.govmapMap.setMapMarker({ x, y, iconType: 'circle' }); } catch (e) { /* marker is a visual aid only */ }
-      }
+      const city = cities.find(c => cityName && (c === cityName || cityName.includes(c) || c.includes(cityName)))
+        || cities.find(c => String(address).includes(c))
+        || this.draft.location;
+      const loc = { id: uid(), city, street, houseNum, address, x, y };
+      this.draft.zoneLocations.push(loc);
+      this.addMapMarker(loc, this.draft.zoneLocations.length);
       this.toast(`מיקום זירה ${this.draft.zoneLocations.length} נוסף`, 'success');
+    },
+    // סימון על המפה (עזר חזותי בלבד) — x=קו אורך, y=קו רוחב
+    addMapMarker(loc, label) {
+      if (!this._gmap || loc.x == null || loc.y == null) return;
+      try {
+        const marker = new google.maps.Marker({ position: { lat: loc.y, lng: loc.x }, map: this._gmap, label: String(label) });
+        (this._gmapMarkers = this._gmapMarkers || {})[loc.id] = marker;
+      } catch (e) { /* אם הסימון נכשל המיקום עדיין נשמר ברשימה */ }
     },
     removeZoneLocation(id) {
       this.draft.zoneLocations = this.draft.zoneLocations.filter(l => l.id !== id);
+      if (this._gmapMarkers && this._gmapMarkers[id]) { this._gmapMarkers[id].setMap(null); delete this._gmapMarkers[id]; }
     },
-    async initGovMap() {
-      if (!this.settings.govmapToken || this.govmapMap) return;
-      this.govmapError = '';
-      this.govmapLoading = true;
+    centerMapOnCity(city) {
+      if (!this._gmap || !this._gmapGeocoder || !city) return;
+      this._gmapGeocoder.geocode({ address: city + ', ישראל', region: 'IL' }, (results, status) => {
+        if (status === 'OK' && results && results[0]) {
+          this._gmap.setCenter(results[0].geometry.location);
+          this._gmap.setZoom(14);
+        }
+      });
+    },
+    handleMapClick(e) {
+      if (!this._gmapGeocoder) return;
+      const latLng = e.latLng;
+      this._gmapGeocoder.geocode({ location: latLng }, (results, status) => {
+        if (status !== 'OK' || !results || !results.length) {
+          this.toast('לא ניתן היה לזהות כתובת בנקודה שנבחרה — נסה נקודה אחרת או הוסף ידנית', 'warning');
+          return;
+        }
+        const r = results.find(x => x.types.includes('street_address') || x.types.includes('premise')) || results[0];
+        const comp = t => (r.address_components.find(c => c.types.includes(t)) || {}).long_name || '';
+        const street = comp('route') || 'נקודה שנבחרה';
+        const houseNum = Number(comp('street_number')) || 1;
+        const cityName = comp('locality') || comp('administrative_area_level_2') || '';
+        this.addZoneLocationFromMap(street, houseNum, r.formatted_address || '', latLng.lng(), latLng.lat(), cityName);
+      });
+    },
+    async initGoogleMap() {
+      if (!this.settings.googleMapsKey) return;
+      const container = document.getElementById('gmap-container');
+      if (!container) return;
+      this.gmapError = '';
+      this.gmapLoading = true;
       try {
-        await loadGovMapScript();
-        const map = await govmap.createMap('govmap-container', { token: this.settings.govmapToken });
-        this.govmapMap = map;
-        govmap.onEvent(govmap.events.CLICK, async (evt) => {
-          const x = evt.x ?? evt.point?.x, y = evt.y ?? evt.point?.y;
-          if (x == null || y == null) return;
-          try {
-            const res = await govmap.geocode({ x, y });
-            const address = (res && (res.address || res.Address || res.result)) || '';
-            const match = String(address).match(/^(.*?)\s+(\d+)/);
-            const street = match ? match[1].trim() : (address || 'נקודה שנבחרה');
-            const houseNum = match ? Number(match[2]) : 1;
-            this.addZoneLocationFromMap(street, houseNum, address, x, y);
-          } catch (e) {
-            this.toast('לא ניתן היה לזהות כתובת בנקודה שנבחרה — נסה נקודה אחרת או הוסף ידנית', 'warning');
-          }
+        await loadGoogleMapsScript(this.settings.googleMapsKey);
+        // המפה נבנית מחדש בכל כניסה לשלב — ה-DOM של השלב נהרס ביציאה (v-if)
+        const map = new google.maps.Map(container, {
+          center: { lat: 31.78, lng: 35.0 }, zoom: 8,
+          mapTypeControl: false, streetViewControl: false,
         });
+        this._gmap = map;
+        this._gmapGeocoder = new google.maps.Geocoder();
+        this._gmapMarkers = {};
+        this.centerMapOnCity(this.manualCity || this.draft.location);
+        this.draft.zoneLocations.forEach((l, i) => this.addMapMarker(l, i + 1));
+        map.addListener('click', (e) => this.handleMapClick(e));
       } catch (e) {
-        this.govmapError = 'טעינת מפת GovMap נכשלה. ודא שהטוקן תקין ורשום לדומיין הנוכחי (' + location.hostname + ').';
+        this.gmapError = 'טעינת Google Maps נכשלה. ודא שהמפתח תקין, ש-Maps JavaScript API ו-Geocoding API מופעלים, ושהמפתח מורשה לדומיין ' + location.hostname;
       } finally {
-        this.govmapLoading = false;
+        this.gmapLoading = false;
       }
     },
     finalizeExercise() {
