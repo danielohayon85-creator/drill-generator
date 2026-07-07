@@ -1376,8 +1376,8 @@ const TEMPLATE = /* html */`
       <p class="home-sub" style="text-align:center;margin-bottom:24px">{{ authMode==='login' ? 'התחברות למערכת' : 'יצירת חשבון חדש' }}</p>
 
       <div class="form-group">
-        <label class="form-label">דוא"ל</label>
-        <input v-model="authEmail" type="email" class="form-control" placeholder="name@example.com" style="direction:ltr" @keyup.enter="authMode==='login'?authLogin():authSignup()" />
+        <label class="form-label">שם משתמש או דוא"ל</label>
+        <input v-model="authEmail" type="text" class="form-control" placeholder="שם משתמש (למשל tal) או אימייל מלא" style="direction:ltr" @keyup.enter="authMode==='login'?authLogin():authSignup()" />
       </div>
       <div class="form-group">
         <label class="form-label">סיסמה</label>
@@ -2683,10 +2683,12 @@ Vue.createApp({
   },
   methods: {
     async authLogin() {
-      if (!this.authEmail || !this.authPassword) { this.authError = 'נא למלא מייל וסיסמה'; return; }
+      if (!this.authEmail || !this.authPassword) { this.authError = 'נא למלא שם משתמש וסיסמה'; return; }
       this.authError = ''; this.authBusy = true;
+      // כמו במערכת התורנויות: מקלידים שם משתמש קצר (tal) והדומיין הפנימי מושלם אוטומטית
+      const email = this.authEmail.trim().includes('@') ? this.authEmail.trim() : `${this.authEmail.trim()}@drillgen.local`;
       try {
-        await fbAuth.signInWithEmailAndPassword(this.authEmail.trim(), this.authPassword);
+        await fbAuth.signInWithEmailAndPassword(email, this.authPassword);
       } catch(e) { this.authError = translateAuthError(e); }
       finally { this.authBusy = false; }
     },
