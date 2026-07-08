@@ -4,7 +4,8 @@ service cloud.firestore {
 
     function isSignedIn() { return request.auth != null; }
 
-    // super_admin: נרשם ב-admins collection בעת קידום
+    // super_admin: נרשם ב-admins collection בעת קידום. exists() ב-rules רץ בהרשאות-על
+    // ולכן אינו תלוי בהרשאת הקריאה של המשתמש ל-admins.
     function isSuperAdmin() { return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
 
     // supervisor: role שמור ב-users document
@@ -15,23 +16,44 @@ service cloud.firestore {
       );
     }
 
-    // כל משתמש מחובר יכול לקרוא/לעדכן את מסמך עצמו; super_admin יכול לנהל את כולם
     match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
-      allow read, update, delete: if isSuperAdmin();
+      // קריאה: המשתמש את עצמו, או super_admin את כולם
+      allow read: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin());
+
+      // כניסה ראשונה: המשתמש יוצר את מסמך עצמו — אך חייב להיווצר כ"עובד" ולא-מושבת,
+      // כדי שלא יוכל לתת לעצמו תפקיד גבוה כבר ביצירה.
+      allow create: if isSignedIn() && request.auth.uid == userId
+                    && request.resource.data.role == 'employee'
+                    && request.resource.data.disabled == false;
+
+      // עדכון עצמי (lastLogin/loginCount): מותר, אך אסור לשנות את התפקיד או את סטטוס ההשבתה של עצמך.
+      // זו החסימה הקריטית מפני הסלמת-הרשאות — עובד לא יכול להפוך את עצמו לממונה/אדמין.
+      allow update: if isSignedIn() && request.auth.uid == userId
+                    && request.resource.data.role == resource.data.role
+                    && request.resource.data.disabled == resource.data.disabled;
+
+      // super_admin בלבד: שינוי תפקיד, השבתה, מחיקה של כל משתמש
+      allow update, delete: if isSuperAdmin();
     }
 
-    // כל משתמש מחובר יכול לכתוב רישום פעילות על עצמו; supervisor ומעלה יכולים לקרוא את כל היומן
+    // יומן פעילות: כל מחובר כותב רישום על עצמו בלבד; supervisor ומעלה קוראים את כל היומן
     match /activity_logs/{logId} {
       allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
       allow read: if isSupervisor();
+      // ללא allow update/delete — רישומי יומן אינם ניתנים לשינוי או מחיקה מהלקוח
     }
 
-    // רשימת super_admin — קריאה לכל מחובר (לדעת אם הוא עצמו super_admin)
-    // כתיבה (קידום/הדחה) רק ל-super_admin קיים
+    // רשימת super_admin — קריאה למשתמש על עצמו או ל-super_admin; כתיבה (קידום/הדחה) רק ל-super_admin.
+    // isSuperAdmin() לא נשען על הרשאת קריאה זו (exists() עוקף rules), לכן אפשר לצמצם ולא לחשוף
+    // את רשימת האדמינים ואת promotedBy לכל מחובר.
     match /admins/{userId} {
-      allow read: if isSignedIn();
+      allow read: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin());
       allow write: if isSuperAdmin();
+    }
+
+    // ברירת מחדל: כל השאר חסום
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
