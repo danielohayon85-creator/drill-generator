@@ -1376,12 +1376,15 @@ const TEMPLATE = /* html */`
       <p class="home-sub" style="text-align:center;margin-bottom:24px">{{ authMode==='login' ? 'התחברות למערכת' : 'יצירת חשבון חדש' }}</p>
 
       <div class="form-group">
-        <label class="form-label">שם משתמש או דוא"ל</label>
-        <input v-model="authEmail" type="text" class="form-control" placeholder="שם משתמש (למשל tal) או אימייל מלא" style="direction:ltr" @keyup.enter="authMode==='login'?authLogin():authSignup()" />
+        <label class="form-label">{{ authMode==='login' ? 'שם משתמש' : 'דוא"ל' }}</label>
+        <input v-model="authEmail" type="text" class="form-control"
+          :placeholder="authMode==='login' ? 'שם משתמש' : 'name@example.com'"
+          :style="authMode==='login' ? '' : 'direction:ltr'"
+          @keyup.enter="authMode==='login'?authLogin():authSignup()" />
       </div>
       <div class="form-group">
         <label class="form-label">סיסמה</label>
-        <input v-model="authPassword" type="password" class="form-control" placeholder="לפחות 6 תווים" style="direction:ltr" @keyup.enter="authMode==='login'?authLogin():authSignup()" />
+        <input v-model="authPassword" type="password" class="form-control" :placeholder="authMode==='login' ? 'סיסמה' : 'לפחות 6 תווים'" style="direction:ltr" @keyup.enter="authMode==='login'?authLogin():authSignup()" />
       </div>
       <div v-if="authError" class="warn-box mb-3">{{ authError }}</div>
 
