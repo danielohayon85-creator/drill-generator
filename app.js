@@ -2587,6 +2587,9 @@ Vue.createApp({
       pptxLoading: false,
       pptxError: '',
       // Auth
+      // חייב להיות data ריאקטיבי ולא computed: computed שנשען על משתנה מודול (fbAuth)
+      // מחושב פעם אחת לפני mounted ונשמר במטמון לעד — וכך שער ההתחברות לא נאכף כלל
+      isAuthConfigured: false,
       authUser: null,
       authReady: false,
       authMode: 'login', // 'login' | 'signup'
@@ -2641,7 +2644,6 @@ Vue.createApp({
     extraCityOptions() {
       return this.cityList.filter(c => c !== this.draft.location && !this.draft.extraLocations.includes(c));
     },
-    isAuthConfigured() { return !!fbAuth; },
     isAdmin() {
       return !!(this.authUser && (
         (typeof ADMIN_EMAILS !== 'undefined' && ADMIN_EMAILS.includes(this.authUser.email)) ||
@@ -3375,6 +3377,7 @@ Vue.createApp({
       this.cityList = Object.keys(data || {}).sort((a,b) => a.localeCompare(b, 'he'));
     });
     initFirebase();
+    this.isAuthConfigured = !!fbAuth;
     if (fbAuth) {
       fbAuth.onAuthStateChanged(async (user) => {
         if (user) {
