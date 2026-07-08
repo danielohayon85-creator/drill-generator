@@ -1368,36 +1368,29 @@ const TEMPLATE = /* html */`
     <iconify-icon icon="fluent:arrow-sync-circle-24-regular" style="font-size:32px;color:var(--navy);animation:spin 1.2s linear infinite" aria-hidden="true"></iconify-icon>
   </div>
 
-  <!-- ── AUTH GATE (login / signup) ── -->
+  <!-- ── AUTH GATE (login only — הרשמה עצמית מושבתת, משתמשים נוצרים ע"י המנהל בלבד) ── -->
   <div v-else-if="isAuthConfigured && !authUser" class="auth-wrap">
     <div class="auth-panel">
       <div class="home-logo" style="margin:0 auto 18px"><iconify-icon icon="fluent:shield-checkmark-24-regular" aria-hidden="true"></iconify-icon></div>
       <h1 class="home-title" style="text-align:center">מחולל תרגילים</h1>
-      <p class="home-sub" style="text-align:center;margin-bottom:24px">{{ authMode==='login' ? 'התחברות למערכת' : 'יצירת חשבון חדש' }}</p>
+      <p class="home-sub" style="text-align:center;margin-bottom:24px">התחברות למערכת</p>
 
       <div class="form-group">
-        <label class="form-label">{{ authMode==='login' ? 'שם משתמש' : 'דוא"ל' }}</label>
-        <input v-model="authEmail" type="text" class="form-control"
-          :placeholder="authMode==='login' ? 'שם משתמש' : 'name@example.com'"
-          :style="authMode==='login' ? '' : 'direction:ltr'"
-          @keyup.enter="authMode==='login'?authLogin():authSignup()" />
+        <label class="form-label">שם משתמש</label>
+        <input v-model="authEmail" type="text" class="form-control" placeholder="שם משתמש" @keyup.enter="authLogin" />
       </div>
       <div class="form-group">
         <label class="form-label">סיסמה</label>
-        <input v-model="authPassword" type="password" class="form-control" :placeholder="authMode==='login' ? 'סיסמה' : 'לפחות 6 תווים'" style="direction:ltr" @keyup.enter="authMode==='login'?authLogin():authSignup()" />
+        <input v-model="authPassword" type="password" class="form-control" placeholder="סיסמה" style="direction:ltr" @keyup.enter="authLogin" />
       </div>
       <div v-if="authError" class="warn-box mb-3">{{ authError }}</div>
 
-      <button v-if="authMode==='login'" class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" :disabled="authBusy" @click="authLogin">
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" :disabled="authBusy" @click="authLogin">
         {{ authBusy ? 'מתחבר...' : 'התחברות' }}
       </button>
-      <button v-else class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" :disabled="authBusy" @click="authSignup">
-        {{ authBusy ? 'יוצר חשבון...' : 'יצירת חשבון' }}
-      </button>
 
-      <div style="text-align:center;margin-top:16px;font-size:13px">
-        <span v-if="authMode==='login'">אין לך חשבון? <a href="#" @click.prevent="authMode='signup';authError=''" style="color:var(--primary)">צור חשבון</a></span>
-        <span v-else>יש לך חשבון? <a href="#" @click.prevent="authMode='login';authError=''" style="color:var(--primary)">התחבר</a></span>
+      <div style="text-align:center;margin-top:16px;font-size:12.5px;color:var(--gray-500)">
+        לקבלת חשבון פנה למנהל המערכת.
       </div>
     </div>
   </div>
